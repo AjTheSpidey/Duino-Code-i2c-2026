@@ -1,7 +1,8 @@
 /*
   DuinoCoin_oled.ino
   created 01 08 2021
-  by Luiz H. Cassettari
+  Original code by: Luiz H. Cassettari
+  Updated by: AjTheSpidey
 */
 
 #define DUINOCOIN_OLED

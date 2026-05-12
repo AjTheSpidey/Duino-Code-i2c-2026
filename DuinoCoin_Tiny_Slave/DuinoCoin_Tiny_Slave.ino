@@ -1,7 +1,8 @@
 /*
   DoinoCoin_Tiny_Slave.ino
   created 07 08 2021
-  by Luiz H. Cassettari
+  Original code by: Luiz H. Cassettari
+  Updated by: AjTheSpidey
 */
 
 #include <ArduinoUniqueID.h>  // https://github.com/ricaun/ArduinoUniqueID

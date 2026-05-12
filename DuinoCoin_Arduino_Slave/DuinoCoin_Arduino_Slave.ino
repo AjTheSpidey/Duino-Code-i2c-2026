@@ -1,7 +1,8 @@
 /*
   DoinoCoin_Arduino_Slave.ino
   created 10 05 2021
-  by Luiz H. Cassettari
+  Original code by: Luiz H. Cassettari
+  Updated by: AjTheSpidey
 */
 
 void setup() {

@@ -1,7 +1,8 @@
 /*
   DoinoCoin_AsyncWebServer.ino
   created 19 05 2021
-  by Luiz H. Cassettari
+  Original code by: Luiz H. Cassettari
+  Updated by: AjTheSpidey
 */
 
 #if ESP8266
@@ -9,12 +10,13 @@
 #include <ESP8266mDNS.h>
 #include <ESPAsyncTCP.h>
 #include <FS.h>
+#include <LittleFS.h>
 #endif
 #if ESP32
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <AsyncTCP.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 #endif
 
 #include <SPIFFSEditor.h>
@@ -34,12 +36,12 @@ void server_setup()
   server.addHandler(&ws);
 
 #ifdef ESP8266
-  SPIFFS.begin();
-  server.addHandler(new SPIFFSEditor(http_username, http_password));
+  LittleFS.begin();
+  server.addHandler(new SPIFFSEditor(http_username, http_password, LittleFS));
 #endif
 #ifdef ESP32
-  SPIFFS.begin(true);
-  server.addHandler(new SPIFFSEditor(SPIFFS, http_username, http_password));
+  LittleFS.begin(true);
+  server.addHandler(new SPIFFSEditor(LittleFS, http_username, http_password));
 #endif
 
   server.on("/heap", HTTP_GET, [](AsyncWebServerRequest * request) {
@@ -68,7 +70,7 @@ void server_setup()
   });
 
 
-  server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.htm");
+  server.serveStatic("/", LittleFS, "/").setDefaultFile("index.htm");
 
   server.begin();
 }

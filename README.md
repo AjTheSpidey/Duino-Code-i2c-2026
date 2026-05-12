@@ -81,6 +81,7 @@ Libraries commonly needed:
 ArduinoJson
 ESPAsyncWebServer
 ESPAsyncTCP or AsyncTCP
+LittleFS
 SSD1306Wire
 StreamString
 ```

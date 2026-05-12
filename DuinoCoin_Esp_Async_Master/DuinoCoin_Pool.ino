@@ -1,7 +1,8 @@
 /*
   DuinoCoin_Pool.ino
   created 31 07 2021
-  by Luiz H. Cassettari
+  Original code by: Luiz H. Cassettari
+  Updated by: AjTheSpidey
 */
 
 #if ESP8266
