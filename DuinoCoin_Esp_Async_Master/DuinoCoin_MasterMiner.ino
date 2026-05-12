@@ -219,12 +219,18 @@ unsigned long masterMiner_hashBudget()
   return master_hash_us_shared;
 }
 
+bool masterMiner_soloMode()
+{
+  return !miningMode_hasI2C() || clients_slaveCount() == 0;
+}
+
 void masterMiner_hashBatch()
 {
   unsigned long sliceStart = micros();
   unsigned long hashBudget = masterMiner_hashBudget();
+  bool soloMode = masterMiner_soloMode();
 
-  while (masterCounter < masterDifficulty && micros() - sliceStart < hashBudget) {
+  while (masterCounter < masterDifficulty) {
     DSHA1 ctx = masterBaseSha1;
     ctx.write((const unsigned char*)masterCounter.c_str(), masterCounter.strlen()).finalize(masterHash);
 
@@ -235,6 +241,12 @@ void masterMiner_hashBatch()
     }
 
     ++masterCounter;
+
+    if (micros() - sliceStart >= hashBudget) {
+      handleSystemEvents();
+      if (!soloMode || !master_turbo_when_solo) break;
+      sliceStart = micros();
+    }
   }
 
   if (!(masterCounter < masterDifficulty)) {
@@ -242,7 +254,7 @@ void masterMiner_hashBatch()
     masterMiner_state(MASTER_STATE_JOB_REQUEST);
   }
 
-  handleSystemEvents();
+  if (!soloMode || !master_turbo_when_solo) handleSystemEvents();
 }
 
 void masterMiner_setup()

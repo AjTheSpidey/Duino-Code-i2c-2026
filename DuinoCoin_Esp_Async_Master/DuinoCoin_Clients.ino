@@ -20,8 +20,6 @@
 #define CLIENT_CONNECT_EVERY 30000
 #define CLIENT_TIMEOUT_CONNECTION 30000
 #define CLIENT_TIMEOUT_REQUEST 100
-#define I2C_SCAN_EMPTY_EVERY 1000
-#define I2C_SCAN_ACTIVE_EVERY 10000
 
 #define END_TOKEN  '\n'
 #define SEP_TOKEN  ','
@@ -86,7 +84,7 @@ bool clientsMOTD = true;
 
 void clients_scanSlaves(bool force)
 {
-  unsigned long interval = clientsSlaveCount == 0 ? I2C_SCAN_EMPTY_EVERY : I2C_SCAN_ACTIVE_EVERY;
+  unsigned long interval = clientsSlaveCount == 0 ? i2c_scan_empty_ms : i2c_scan_active_ms;
   if (!force && millis() - clientsLastScan < interval) return;
 
   clientsLastScan = millis();

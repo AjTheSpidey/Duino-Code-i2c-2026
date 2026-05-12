@@ -48,10 +48,18 @@ const char* wifi_3_name = "";
 const char* wifi_3_pass = "";
 
 const bool auto_i2c_slaves = true;
+const bool master_turbo_when_solo = true;
 const byte max_avr_miners = 16;
+const unsigned long master_hash_us_single = 250000;
+const unsigned long master_hash_us_shared = 20000;
+const unsigned long i2c_scan_empty_ms = 15000;
+const unsigned long i2c_scan_active_ms = 5000;
 ```
 
 Three WiFi profiles are supported. If all WiFi names are empty, the ESP tries saved WiFi credentials.
+
+For fastest solo mining, keep `master_turbo_when_solo` enabled and increase `master_hash_us_single` carefully. Bigger
+values mine harder when no I2C slaves are online, but web dashboard and OTA updates will respond less often.
 
 ## ESP master upload files
 

@@ -44,9 +44,12 @@ const char* wifi_3_name = "";          // Backup WiFi SSID
 const char* wifi_3_pass = "";          // Backup WiFi password
 
 const bool auto_i2c_slaves = true;      // Master always mines; I2C slaves are detected automatically
+const bool master_turbo_when_solo = true; // No slaves online: hash continuously and only pause for WiFi/OTA
 const byte max_avr_miners = 16;        // More than 10 is supported; 16 is safer for ESP RAM
-const unsigned long master_hash_us_single = 50000; // Bigger = faster solo master, slower background checks
-const unsigned long master_hash_us_shared = 8000;  // Smaller = smoother I2C slaves when both are mining
+const unsigned long master_hash_us_single = 250000; // Full-power solo slice when no I2C slaves are online
+const unsigned long master_hash_us_shared = 20000;  // Shared slice when ESP and I2C slaves mine together
+const unsigned long i2c_scan_empty_ms = 15000;      // Empty-bus scan delay; bigger = faster solo mining
+const unsigned long i2c_scan_active_ms = 5000;      // Active-bus scan delay; smaller = faster slave detection
 // ----------------------------------------------------------- //
 
 struct WifiCredential {
