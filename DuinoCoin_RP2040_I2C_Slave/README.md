@@ -1,18 +1,22 @@
-# DuinoCoin RP2040 I2C Slave
+# RP2040 I2C Slave
 
-Starter for Raspberry Pi Pico / RP2040 boards using Arduino-Pico or Mbed RP2040 cores.
+RP2040 / Raspberry Pi Pico slave for the ESP and Raspberry Pi I2C masters.
 
-This follows the same line protocol as the AVR slave:
+Protocol:
 
 ```text
 lastBlockHash,expectedHash,difficulty\n
 ```
 
-It returns:
+Return format:
 
 ```text
 nonce,elapsedMicros,DUCOID-RP2040-address\n
 ```
 
-The actual `Ducos1a.work(...)` call depends on whether your selected DuinoCoin Arduino library supports RP2040. If it does not, use the ESP master's `DSHA1.h` and `Counter.h` pattern as the hashing core.
+Notes:
 
+- Use an Arduino-compatible RP2040 core.
+- The selected `DuinoCoin` library must support your core.
+- Default I2C address is `0x12`; change `I2C_ADDRESS` if you run more than one RP2040 slave.
+- RP2040 is 3.3V only. Use level shifting with 5V boards.

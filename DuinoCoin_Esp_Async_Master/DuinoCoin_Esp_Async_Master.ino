@@ -20,8 +20,8 @@ void clients_scanSlaves(bool force);
 int clients_slaveCount();
 
 // ---------------------- Easy Settings ---------------------- //
-const char* user = "ricaun";           // Duino-Coin username
-const char* rig = "AVR I2C v3.2";      // Rig name shown in the wallet
+const char* user = "your_username";    // Duino-Coin username
+const char* rig = "Duino-I2C-2026";    // Rig name shown in the wallet
 const char* mining_key = "";           // Wallet mining key, leave empty if disabled
 
 const char* wifi_1_name = "";          // Main WiFi SSID

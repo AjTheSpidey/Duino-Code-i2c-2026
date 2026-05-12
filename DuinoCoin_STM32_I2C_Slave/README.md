@@ -1,10 +1,22 @@
-# DuinoCoin STM32 I2C Slave
+# STM32 I2C Slave
 
-Starter STM32 slave for the same ESP/Raspberry Pi I2C master protocol.
+STM32 slave for the ESP and Raspberry Pi I2C masters.
 
-Target:
-- STM32 boards using an Arduino-compatible STM32 core.
-- The sketch expects a `DuinoCoin` library compatible with the selected core.
+It follows the same line protocol as the AVR slave:
 
-Edit `I2C_ADDRESS` if you do not want auto-addressing.
+```text
+lastBlockHash,expectedHash,difficulty\n
+```
 
+It returns:
+
+```text
+nonce,elapsedMicros,DUCOID-STM32-address\n
+```
+
+Notes:
+
+- Designed for Arduino-compatible STM32 cores.
+- The selected `DuinoCoin` library must support your STM32 core.
+- Leave `I2C_ADDRESS` as `0` for simple auto-addressing, or set a fixed address.
+- Use 3.3V-safe wiring. Add a level shifter if the I2C master or other slaves run at 5V.

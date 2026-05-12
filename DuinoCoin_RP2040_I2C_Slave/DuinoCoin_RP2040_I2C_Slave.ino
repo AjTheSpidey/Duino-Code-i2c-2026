@@ -6,6 +6,16 @@
 String receiveBuffer;
 String responseBuffer = "\n";
 
+String boardId() {
+  #if defined(ARDUINO_ARCH_RP2040)
+    return "RP2040";
+  #elif defined(ARDUINO_RASPBERRY_PI_PICO)
+    return "PICO";
+  #else
+    return "MCU";
+  #endif
+}
+
 void receiveEvent(int howMany) {
   while (Wire.available()) {
     receiveBuffer += (char)Wire.read();
@@ -48,7 +58,8 @@ void loop() {
   unsigned int result = Ducos1a.work(lastBlockHash, expectedHash, difficulty);
   unsigned long elapsed = micros() - start;
 
-  responseBuffer = String(result) + "," + String(elapsed) + ",DUCOID-RP2040-" + String(I2C_ADDRESS) + "\n";
+  responseBuffer = String(result) + "," +
+                   String(elapsed) + "," +
+                   "DUCOID-" + boardId() + "-" + String(I2C_ADDRESS) + "\n";
   Serial.println(responseBuffer);
 }
-

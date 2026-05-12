@@ -8,9 +8,9 @@ The main build is an ESP8266/ESP32 master that mines on its own and also watches
 
 - ESP8266/ESP32 automatic I2C master miner
 - Arduino AVR I2C slave miner for Uno, Nano, Mega, Leonardo, Micro, and similar boards
-- Raspberry Pi I2C master prototype
-- STM32 I2C slave starter
-- RP2040 / Pico I2C slave starter
+- Raspberry Pi automatic I2C master
+- STM32 I2C slave sketch
+- RP2040 / Pico I2C slave sketch
 - Experimental notes for master-to-master bridge setups
 
 ## ESP master behavior
@@ -127,14 +127,16 @@ The slave reports a board tag in its ID when the Arduino core exposes it, for ex
 DuinoCoin_RaspberryPi_I2C_Master
 ```
 
-Python Raspberry Pi master prototype. It has the same basic idea: local mining plus I2C slave control.
+Python Raspberry Pi master. It has the same basic idea: local mining plus I2C slave control.
+
+The Pi version uses separate workers and separate pool connections so it keeps mining locally while it serves I2C slaves.
 
 ```text
 DuinoCoin_STM32_I2C_Slave
 DuinoCoin_RP2040_I2C_Slave
 ```
 
-Starter sketches for non-AVR slave boards. Library support varies by board core.
+Slave sketches for non-AVR boards using the same line protocol as the AVR slave. Library support varies by board core.
 
 ```text
 DuinoCoin_MasterBridge_Experimental
@@ -144,4 +146,4 @@ Notes and a small serial status stub for master-to-master rigs.
 
 ## Status
 
-This is a practical 2026 refresh of the older ESP I2C master idea. The ESP master path is the main target. Raspberry Pi, STM32, RP2040, and bridge folders are included as starting points for more specialized builds.
+This is a practical 2026 refresh of the older ESP I2C master idea. The ESP and Raspberry Pi master paths are the main targets. STM32, RP2040, and bridge folders are included for more specialized builds.

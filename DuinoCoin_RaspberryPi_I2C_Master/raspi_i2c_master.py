@@ -1,6 +1,7 @@
 import hashlib
 import json
 import socket
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -40,54 +41,73 @@ def recv_line(sock, timeout=30):
         data.extend(chunk)
 
 
-def connect_to_pool():
-    host, port, name = get_pool()
-    sock = socket.create_connection((host, port), timeout=20)
-    version = recv_line(sock)
-    print(f"[pool] {name} {host}:{port} version={version}")
-    return sock
+class PoolClient:
+    def __init__(self, label):
+        self.label = label
+        self.sock = None
 
+    def close(self):
+        if self.sock:
+            try:
+                self.sock.close()
+            except OSError:
+                pass
+        self.sock = None
 
-def request_job(sock, user, job_type, mining_key):
-    parts = ["JOB", user, job_type]
-    if mining_key:
-        parts.append(mining_key)
-    sock.sendall((",".join(parts) + "\n").encode("utf-8"))
-    return recv_line(sock)
-
-
-def mine_local_once(sock, cfg, has_slaves):
-    job = request_job(sock, cfg["user"], cfg["local_job_type"], cfg.get("mining_key", ""))
-    last_hash, expected_hash, raw_diff = job.split(",", 2)
-    difficulty = int(raw_diff) * 100 + 1
-    batch = cfg["hash_batch_shared"] if has_slaves else cfg["hash_batch_single"]
-
-    start = time.perf_counter()
-    for nonce in range(difficulty):
-        digest = hashlib.sha1((last_hash + str(nonce)).encode("ascii")).hexdigest()
-        if digest == expected_hash.lower():
-            elapsed = max(time.perf_counter() - start, 0.000001)
-            hashrate = nonce / elapsed
-            payload = f"{nonce},{hashrate:.2f},Raspberry Pi I2C Master,{cfg['rig']},DUCOIDRPI\n"
-            sock.sendall(payload.encode("utf-8"))
-            print(f"[self] {payload.strip()} -> {recv_line(sock, timeout=30)}")
+    def connect(self):
+        if self.sock:
             return
-        if nonce and nonce % batch == 0:
-            time.sleep(0)
+        host, port, name = get_pool()
+        self.sock = socket.create_connection((host, port), timeout=20)
+        version = recv_line(self.sock)
+        print(f"[{self.label}] {name} {host}:{port} version={version}")
+
+    def request_job(self, user, job_type, mining_key):
+        self.connect()
+        parts = ["JOB", user, job_type]
+        if mining_key:
+            parts.append(mining_key)
+        self.sock.sendall((",".join(parts) + "\n").encode("utf-8"))
+        return recv_line(self.sock)
+
+    def submit(self, payload):
+        self.connect()
+        self.sock.sendall((payload + "\n").encode("utf-8"))
+        return recv_line(self.sock, timeout=30)
 
 
-class I2CMaster:
+class SlaveState:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.addresses = []
+
+    def set(self, addresses):
+        with self.lock:
+            self.addresses = list(addresses)
+
+    def any(self):
+        with self.lock:
+            return bool(self.addresses)
+
+    def count(self):
+        with self.lock:
+            return len(self.addresses)
+
+
+class I2CBus:
     def __init__(self, cfg):
         if SMBus is None:
             raise RuntimeError("Install smbus2 first: python3 -m pip install smbus2")
         self.cfg = cfg
         self.bus = SMBus(cfg["i2c_bus"])
-        self.slaves = []
         self.last_scan = 0
+        self.slaves = []
 
     def scan(self, force=False):
-        if not force and time.monotonic() - self.last_scan < self.cfg["i2c_scan_seconds"]:
+        interval = self.cfg["i2c_scan_seconds"] if self.slaves else self.cfg["i2c_empty_scan_seconds"]
+        if not force and time.monotonic() - self.last_scan < interval:
             return self.slaves
+
         self.last_scan = time.monotonic()
         found = []
         for address in range(self.cfg["i2c_first_address"], self.cfg["i2c_last_address"] + 1):
@@ -96,13 +116,17 @@ class I2CMaster:
                 found.append(address)
             except OSError:
                 pass
+        if found != self.slaves:
+            print(f"[i2c] detected slaves: {found if found else 'none'}")
         self.slaves = found
-        return found
+        return self.slaves
 
     def write_line(self, address, text):
-        for char in text + "\n":
-            self.bus.write_byte(address, ord(char))
-            time.sleep(0.001)
+        for offset in range(0, len(text) + 1, 31):
+            chunk = (text + "\n")[offset:offset + 31]
+            for char in chunk:
+                self.bus.write_byte(address, ord(char))
+                time.sleep(self.cfg["i2c_byte_delay_seconds"])
 
     def read_line(self, address, timeout=5):
         deadline = time.monotonic() + timeout
@@ -118,34 +142,87 @@ class I2CMaster:
         return data.decode("utf-8", errors="replace")
 
 
-def serve_slave_once(sock, i2c, address, cfg):
-    job = request_job(sock, cfg["user"], "AVR", cfg.get("mining_key", ""))
-    i2c.write_line(address, job)
-    result = i2c.read_line(address)
-    if not result:
+def hash_job(last_hash, expected_hash, difficulty, yield_every):
+    expected = expected_hash.lower()
+    start = time.perf_counter()
+    for nonce in range(difficulty):
+        digest = hashlib.sha1((last_hash + str(nonce)).encode("ascii")).hexdigest()
+        if digest == expected:
+            elapsed = max(time.perf_counter() - start, 0.000001)
+            return nonce, nonce / elapsed
+        if nonce and nonce % yield_every == 0:
+            time.sleep(0)
+    return 0, 0.0
+
+
+def local_miner(cfg, slave_state):
+    client = PoolClient("self")
+    while True:
+        try:
+            job = client.request_job(cfg["user"], cfg["local_job_type"], cfg.get("mining_key", ""))
+            last_hash, expected_hash, raw_diff = job.split(",", 2)
+            difficulty = int(raw_diff) * 100 + 1
+            yield_every = cfg["hash_yield_shared"] if slave_state.any() else cfg["hash_yield_single"]
+            nonce, hashrate = hash_job(last_hash, expected_hash, difficulty, yield_every)
+            payload = f"{nonce},{hashrate:.2f},Raspberry Pi I2C Master,{cfg['rig']} [M],DUCOIDRPI"
+            print(f"[self] {payload} -> {client.submit(payload)}")
+        except Exception as exc:
+            print(f"[self] reconnecting after: {exc}")
+            client.close()
+            time.sleep(3)
+
+
+def serve_slave_once(cfg, bus, address):
+    client = PoolClient(f"i2c-{address}")
+    try:
+        job = client.request_job(cfg["user"], cfg["slave_job_type"], cfg.get("mining_key", ""))
+        bus.write_line(address, job)
+        result = bus.read_line(address, timeout=cfg["i2c_slave_timeout_seconds"])
+        if not result:
+            return
+
+        nonce, micros, *rest = result.split(",")
+        elapsed = max(int(micros) * 0.000001, 0.000001)
+        hashrate = int(nonce) / elapsed
+        ducoid = rest[0] if rest else f"DUCOIDI2C{address:02X}"
+        payload = f"{nonce},{hashrate:.2f},AVR I2C,{cfg['rig']} [{address}],{ducoid}"
+        print(f"[i2c {address}] {payload} -> {client.submit(payload)}")
+    finally:
+        client.close()
+
+
+def i2c_controller(cfg, slave_state):
+    if not cfg.get("auto_i2c_slaves", True):
+        print("[i2c] disabled")
         return
-    nonce, micros, *rest = result.split(",")
-    elapsed = max(int(micros) * 0.000001, 0.000001)
-    hashrate = int(nonce) / elapsed
-    ducoid = rest[0] if rest else f"DUCOIDI2C{address:02X}"
-    payload = f"{nonce},{hashrate:.2f},AVR I2C,{cfg['rig']} [{address}],{ducoid}\n"
-    sock.sendall(payload.encode("utf-8"))
-    print(f"[i2c {address}] {payload.strip()} -> {recv_line(sock, timeout=30)}")
+
+    bus = I2CBus(cfg)
+    while True:
+        try:
+            slaves = bus.scan()
+            slave_state.set(slaves)
+            for address in slaves:
+                serve_slave_once(cfg, bus, address)
+        except Exception as exc:
+            print(f"[i2c] recovering after: {exc}")
+            time.sleep(2)
 
 
 def main():
     cfg = load_config()
-    mode = cfg.get("mode", "both").lower()
-    i2c = I2CMaster(cfg) if mode in ("i2c", "both") else None
-    sock = connect_to_pool()
+    slave_state = SlaveState()
+
+    threads = [
+        threading.Thread(target=local_miner, args=(cfg, slave_state), daemon=True),
+        threading.Thread(target=i2c_controller, args=(cfg, slave_state), daemon=True),
+    ]
+
+    for thread in threads:
+        thread.start()
 
     while True:
-        slaves = i2c.scan() if i2c else []
-        if mode in ("i2c", "both"):
-            for address in slaves:
-                serve_slave_once(sock, i2c, address, cfg)
-        if mode in ("single", "both"):
-            mine_local_once(sock, cfg, bool(slaves))
+        time.sleep(5)
+        print(f"[status] i2c_slaves={slave_state.count()}")
 
 
 if __name__ == "__main__":

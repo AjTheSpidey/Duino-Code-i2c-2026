@@ -1,11 +1,8 @@
-# DuinoCoin Raspberry Pi I2C Master
+# Raspberry Pi I2C Master
 
-This is a Raspberry Pi version of the ESP I2C master idea.
+This is the Raspberry Pi version of the automatic ESP master.
 
-Modes:
-- `single`: Pi mines by itself.
-- `i2c`: Pi only controls I2C AVR slaves.
-- `both`: Pi mines and controls I2C AVR slaves.
+It always mines locally. If `auto_i2c_slaves` is enabled, a second worker scans the I2C bus and serves AVR-compatible slaves as they appear.
 
 Install:
 
@@ -19,9 +16,19 @@ Edit `config.example.json`, save it as `config.json`, then run:
 python3 raspi_i2c_master.py
 ```
 
-Wiring notes:
+Behavior:
+
+```text
+No slaves detected  -> Pi keeps mining locally
+Slaves detected     -> Pi keeps mining and also feeds I2C slaves
+Slaves removed      -> Pi keeps mining and rescans in the background
+```
+
+Wiring:
+
 - Raspberry Pi SDA: GPIO2 / physical pin 3
 - Raspberry Pi SCL: GPIO3 / physical pin 5
-- Common GND is required.
-- AVR slaves should use level shifting if they run at 5V.
+- Common GND is required
+- Use a level shifter with 5V AVR boards
 
+The Pi version uses two workers and separate Duino-Coin pool connections so local mining does not stop while I2C slaves are being served.

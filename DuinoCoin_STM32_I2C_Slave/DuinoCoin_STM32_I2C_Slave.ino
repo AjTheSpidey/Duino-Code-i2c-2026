@@ -2,18 +2,28 @@
 #include <DuinoCoin.h>
 
 #define I2C_ADDRESS 0
+#define ADDRESS_FIRST 1
+#define ADDRESS_LAST 119
 
 String receiveBuffer;
 String responseBuffer = "\n";
 byte i2cAddress = 1;
 
+String boardId();
+
 byte chooseAddress() {
   if (I2C_ADDRESS > 0) return I2C_ADDRESS;
-  for (byte address = 1; address < 120; address++) {
+
+  Wire.begin();
+  for (byte address = ADDRESS_FIRST; address <= ADDRESS_LAST; address++) {
     Wire.beginTransmission(address);
-    if (Wire.endTransmission() != 0) return address;
+    if (Wire.endTransmission() != 0) {
+      Wire.end();
+      return address;
+    }
   }
-  return 1;
+  Wire.end();
+  return ADDRESS_FIRST;
 }
 
 void receiveEvent(int howMany) {
@@ -24,8 +34,7 @@ void receiveEvent(int howMany) {
 
 void requestEvent() {
   char c = '\n';
-  int newline = responseBuffer.indexOf('\n');
-  if (responseBuffer.length() > 0 && newline != -1) {
+  if (responseBuffer.length() > 0 && responseBuffer.indexOf('\n') != -1) {
     c = responseBuffer.charAt(0);
     responseBuffer.remove(0, 1);
   }
@@ -33,7 +42,9 @@ void requestEvent() {
 }
 
 String boardId() {
-  #if defined(ARDUINO_ARCH_STM32)
+  #if defined(ARDUINO_GENERIC_F103C8TX) || defined(ARDUINO_BLUEPILL_F103C8)
+    return "STM32F103";
+  #elif defined(ARDUINO_ARCH_STM32)
     return "STM32";
   #else
     return "MCU";
@@ -42,13 +53,11 @@ String boardId() {
 
 void setup() {
   Serial.begin(115200);
-  Wire.begin();
   i2cAddress = chooseAddress();
-  Wire.end();
   Wire.begin(i2cAddress);
   Wire.onReceive(receiveEvent);
   Wire.onRequest(requestEvent);
-  Serial.println(String("STM32 I2C address: ") + i2cAddress);
+  Serial.println(String("STM32 I2C slave address: ") + i2cAddress);
 }
 
 void loop() {
@@ -70,7 +79,8 @@ void loop() {
   unsigned int result = Ducos1a.work(lastBlockHash, expectedHash, difficulty);
   unsigned long elapsed = micros() - start;
 
-  responseBuffer = String(result) + "," + String(elapsed) + ",DUCOID-" + boardId() + "-" + String(i2cAddress) + "\n";
+  responseBuffer = String(result) + "," +
+                   String(elapsed) + "," +
+                   "DUCOID-" + boardId() + "-" + String(i2cAddress) + "\n";
   Serial.println(responseBuffer);
 }
-
