@@ -19,14 +19,11 @@
 #include <LittleFS.h>
 #endif
 
-#include <SPIFFSEditor.h>
+
 #include <ESPAsyncWebServer.h>
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
-
-const char* http_username = "admin";
-const char* http_password = "admin";
 
 void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len);
 
@@ -36,12 +33,14 @@ void server_setup()
   server.addHandler(&ws);
 
 #ifdef ESP8266
-  LittleFS.begin();
-  server.addHandler(new SPIFFSEditor(http_username, http_password, LittleFS));
+  if (!LittleFS.begin()) {
+    Serial.println("LittleFS mount failed");
+  }
 #endif
 #ifdef ESP32
-  LittleFS.begin(true);
-  server.addHandler(new SPIFFSEditor(LittleFS, http_username, http_password));
+  if (!LittleFS.begin(true)) {
+    Serial.println("LittleFS mount failed");
+  }
 #endif
 
   server.on("/heap", HTTP_GET, [](AsyncWebServerRequest * request) {
