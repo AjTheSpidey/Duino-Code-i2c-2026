@@ -20,13 +20,24 @@ bool miningMode_hasI2C();
 void clients_scanSlaves(bool force);
 int clients_slaveCount();
 
+// Board detection must happen before any ESP-specific includes in the sketch tabs.
+#if defined(ESP8266) || defined(ARDUINO_ARCH_ESP8266)
+  #define DUCO_ESP8266 1
+  #define DUCO_ESP32 0
+#elif defined(ESP32) || defined(ARDUINO_ARCH_ESP32)
+  #define DUCO_ESP8266 0
+  #define DUCO_ESP32 1
+#else
+  #error "Select an ESP8266 or ESP32 board for DuinoCoin_Esp_Async_Master."
+#endif
+
 // ---------------------- Easy Settings ---------------------- //
 const char* user = "your_username";    // Duino-Coin username
 const char* rig = "Duino-I2C-2026";    // Rig name shown in the wallet
 const char* mining_key = "";           // Wallet mining key, leave empty if disabled
 
-const char* wifi_1_name = "";          // Main WiFi SSID
-const char* wifi_1_pass = "";          // Main WiFi password
+const char* wifi_1_name = "your_wifi_name";          // Main WiFi SSID
+const char* wifi_1_pass = "your_wifi_password";      // Main WiFi password
 const char* wifi_2_name = "";          // Backup WiFi SSID
 const char* wifi_2_pass = "";          // Backup WiFi password
 const char* wifi_3_name = "";          // Backup WiFi SSID
@@ -53,12 +64,12 @@ const char* ducouser      = user;
 const char* minerKey      = mining_key;
 const char* rigIdentifier = rig;
 
-#if ESP8266
+#if DUCO_ESP8266
 #include <ESP8266WiFi.h> // Include WiFi library
 #include <ESP8266mDNS.h> // OTA libraries
 #include <WiFiUdp.h>
 #endif
-#if ESP32
+#if DUCO_ESP32
 #include <WiFi.h>
 #endif
 
@@ -70,13 +81,13 @@ const char* rigIdentifier = rig;
 #define BLINK_CLIENT_CONNECT 3
 #define BLINK_RESET_DEVICE   5
 
-#if ESP8266
+#if DUCO_ESP8266
 #define LED_BUILTIN 2
 #define MINER "AVR I2C v3.2"
 #define JOB "AVR"
 #endif
 
-#if ESP32
+#if DUCO_ESP32
 #define LED_BUILTIN 2
 #define MINER "AVR I2C v3.2"
 #define JOB "AVR"
@@ -97,10 +108,10 @@ bool miningMode_hasI2C()
 void SetupWifi() {
   WiFi.mode(WIFI_STA); // Setup ESP in client mode
 
-  #if ESP8266
+  #if DUCO_ESP8266
     WiFi.setSleepMode(WIFI_NONE_SLEEP);
   #endif
-  #if ESP32
+  #if DUCO_ESP32
     WiFi.setSleep(false);
   #endif
 
@@ -172,13 +183,13 @@ void SetupOTA() {
     else if (error == OTA_END_ERROR) Serial.println("End Failed");
   });
 
-#if ESP8266
+#if DUCO_ESP8266
   char hostname[32];
   sprintf(hostname, "Miner-Async-%06x", ESP.getChipId());
   ArduinoOTA.setHostname(hostname);
 #endif
 
-#if ESP32
+#if DUCO_ESP32
   char hostname[32];
   sprintf(hostname, "Miner32-Async-%06x", (uint32_t)ESP.getEfuseMac());
   ArduinoOTA.setHostname(hostname);
@@ -199,10 +210,10 @@ void RestartESP(String msg) {
   Serial.println(msg);
   Serial.println("Resetting ESP...");
   blink(BLINK_RESET_DEVICE);
-  #if ESP8266
+  #if DUCO_ESP8266
     ESP.reset();
   #endif
-  #if ESP32
+  #if DUCO_ESP32
     ESP.restart();
   #endif
 }
@@ -213,11 +224,11 @@ void setup() {
   Serial.print("\nDuino-Coin ");
   Serial.println(MINER);
 
-  #if ESP8266
+  #if DUCO_ESP8266
     system_update_cpu_freq(160);
     os_update_cpu_frequency(160);
   #endif
-  #if ESP32
+  #if DUCO_ESP32
     setCpuFrequencyMhz(240);
   #endif
 

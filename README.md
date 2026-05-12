@@ -37,11 +37,11 @@ Edit the block near the top:
 
 ```cpp
 const char* user = "your_username";
-const char* rig = "AVR I2C v3.2";
+const char* rig = "Duino-I2C-2026";
 const char* mining_key = "";
 
-const char* wifi_1_name = "";
-const char* wifi_1_pass = "";
+const char* wifi_1_name = "your_wifi_name";
+const char* wifi_1_pass = "your_wifi_password";
 const char* wifi_2_name = "";
 const char* wifi_2_pass = "";
 const char* wifi_3_name = "";
@@ -78,13 +78,14 @@ Counter.h
 Libraries commonly needed:
 
 ```text
-ArduinoJson
 ESPAsyncWebServer
 ESPAsyncTCP or AsyncTCP
 LittleFS
-SSD1306Wire
+ESP8266 and ESP32 OLED driver for SSD1306 displays by ThingPulse
 StreamString
 ```
+
+The ESP master was compile-checked with `esp32:esp32:esp32` and `esp8266:esp8266:nodemcuv2`.
 
 ## AVR slave upload files
 

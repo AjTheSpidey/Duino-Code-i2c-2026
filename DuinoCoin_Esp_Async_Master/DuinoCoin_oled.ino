@@ -7,13 +7,13 @@
 
 #define DUINOCOIN_OLED
 
-#if ESP8266
+#if DUCO_ESP8266
 #define OLED_SDA 4 // D2 - A4 - GPIO4
 #define OLED_SCL 5 // D1 - A5 - GPIO5
 #define OLED_ADDR 0x3C
 #endif
 
-#if ESP32
+#if DUCO_ESP32
 #define OLED_SDA 4
 #define OLED_SCL 15
 #define OLED_ADDR 0x3C

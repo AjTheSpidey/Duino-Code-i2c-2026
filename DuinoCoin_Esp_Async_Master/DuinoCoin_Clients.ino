@@ -5,12 +5,12 @@
   Updated by: AjTheSpidey
 */
 
-#if ESP8266
+#if DUCO_ESP8266
 #include <ESP8266WiFi.h> // Include WiFi library
 #include <ESP8266mDNS.h> // OTA libraries
 #include <WiFiUdp.h>
 #endif
-#if ESP32
+#if DUCO_ESP32
 #include <WiFi.h>
 #include <WiFiClient.h>
 #endif

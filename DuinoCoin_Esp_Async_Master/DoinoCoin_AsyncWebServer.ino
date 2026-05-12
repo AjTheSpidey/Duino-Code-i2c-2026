@@ -5,14 +5,14 @@
   Updated by: AjTheSpidey
 */
 
-#if ESP8266
+#if DUCO_ESP8266
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <ESPAsyncTCP.h>
 #include <FS.h>
 #include <LittleFS.h>
 #endif
-#if ESP32
+#if DUCO_ESP32
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <AsyncTCP.h>
@@ -32,12 +32,12 @@ void server_setup()
   ws.onEvent(onWsEvent);
   server.addHandler(&ws);
 
-#ifdef ESP8266
+#if DUCO_ESP8266
   if (!LittleFS.begin()) {
     Serial.println("LittleFS mount failed");
   }
 #endif
-#ifdef ESP32
+#if DUCO_ESP32
   if (!LittleFS.begin(true)) {
     Serial.println("LittleFS mount failed");
   }

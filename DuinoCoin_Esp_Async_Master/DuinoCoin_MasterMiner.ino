@@ -6,12 +6,12 @@
 #include "DSHA1.h"
 #include "Counter.h"
 
-#if ESP8266
+#if DUCO_ESP8266
 #define MASTER_JOB_TYPE "ESP8266H"
 #define MASTER_MINER_NAME "ESP8266 I2C Master"
 #endif
 
-#if ESP32
+#if DUCO_ESP32
 #if defined(CONFIG_FREERTOS_UNICORE)
 #define MASTER_JOB_TYPE "ESP32S"
 #else
@@ -24,18 +24,15 @@
 #define MASTER_READ_TIMEOUT 100
 #define MASTER_TIMEOUT 30000
 
-enum MasterMinerState
-{
-  MASTER_STATE_CONNECT,
-  MASTER_STATE_VERSION_WAIT,
-  MASTER_STATE_JOB_REQUEST,
-  MASTER_STATE_JOB_WAIT,
-  MASTER_STATE_HASHING,
-  MASTER_STATE_RESULT_WAIT
-};
+const byte MASTER_STATE_CONNECT = 0;
+const byte MASTER_STATE_VERSION_WAIT = 1;
+const byte MASTER_STATE_JOB_REQUEST = 2;
+const byte MASTER_STATE_JOB_WAIT = 3;
+const byte MASTER_STATE_HASHING = 4;
+const byte MASTER_STATE_RESULT_WAIT = 5;
 
 WiFiClient masterClient;
-MasterMinerState masterState = MASTER_STATE_CONNECT;
+byte masterState = MASTER_STATE_CONNECT;
 String masterBuffer = "";
 String masterLastBlockHash = "";
 String masterExpectedHashString = "";
@@ -52,7 +49,7 @@ unsigned long masterAcceptedShares = 0;
 float masterHashrate = 0.0;
 String masterDucoId = "";
 
-void masterMiner_state(MasterMinerState state)
+void masterMiner_state(byte state)
 {
   masterState = state;
   masterStateTime = millis();
@@ -60,13 +57,13 @@ void masterMiner_state(MasterMinerState state)
 
 String masterMiner_chipId()
 {
-  #if ESP8266
+  #if DUCO_ESP8266
     String id = String(ESP.getChipId(), HEX);
     id.toUpperCase();
     return id;
   #endif
 
-  #if ESP32
+  #if DUCO_ESP32
     uint64_t chipId = ESP.getEfuseMac();
     uint16_t high = (uint16_t)(chipId >> 32);
     char id[17];

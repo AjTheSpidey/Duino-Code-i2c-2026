@@ -5,35 +5,54 @@
   Updated by: AjTheSpidey
 */
 
-#if ESP8266
+#if DUCO_ESP8266
 #include <ESP8266HTTPClient.h>
 #include <WiFiClient.h>
 #endif
-#if ESP32
+#if DUCO_ESP32
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #endif
 
-#include <ArduinoJson.h>
-
 const char * urlPool = "https://server.duinocoin.com/getPool";
+
+String pool_getJsonString(String input, const char* key)
+{
+  String token = String("\"") + key + "\":\"";
+  int start = input.indexOf(token);
+  if (start < 0) return "";
+  start += token.length();
+  int end = input.indexOf('"', start);
+  if (end < 0) return "";
+  return input.substring(start, end);
+}
+
+int pool_getJsonInt(String input, const char* key)
+{
+  String token = String("\"") + key + "\":";
+  int start = input.indexOf(token);
+  if (start < 0) return 0;
+  start += token.length();
+  int end = input.indexOf(',', start);
+  if (end < 0) end = input.indexOf('}', start);
+  if (end < 0) return 0;
+  return input.substring(start, end).toInt();
+}
 
 void UpdateHostPort(String input)
 {
   // {"ip":"server.duinocoin.com","port":2812,"name":"Main server"}
-  DynamicJsonDocument doc(256);
-  DeserializationError error = deserializeJson(doc, input);
-  if (error) {
-    Serial.println("[ ]Pool JSON parse failed: " + String(error.c_str()));
+  String name = pool_getJsonString(input, "name");
+  String ip = pool_getJsonString(input, "ip");
+  int port = pool_getJsonInt(input, "port");
+
+  if (ip.length() == 0 || port == 0) {
+    Serial.println("[ ]Pool JSON parse failed: " + input);
     return;
   }
 
-  const char* name = doc["name"];
-  const char* ip = doc["ip"];
-  int port = doc["port"];
-
-  Serial.println("[ ]Update " + String(name) + " " + String(ip) + " " + String(port));
-  SetHostPort(String(ip), port);
+  Serial.println("[ ]Update " + name + " " + ip + " " + String(port));
+  SetHostPort(ip, port);
 }
 
 void UpdatePool()
