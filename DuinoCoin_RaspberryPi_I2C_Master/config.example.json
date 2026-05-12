@@ -1,0 +1,14 @@
+{
+  "user": "your_duino_user",
+  "rig": "RPI-I2C-Master",
+  "mining_key": "",
+  "mode": "both",
+  "local_job_type": "ESP32",
+  "i2c_bus": 1,
+  "i2c_first_address": 1,
+  "i2c_last_address": 16,
+  "i2c_scan_seconds": 2,
+  "hash_batch_single": 20000,
+  "hash_batch_shared": 2000
+}
+
