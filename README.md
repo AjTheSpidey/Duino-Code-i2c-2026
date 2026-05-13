@@ -74,7 +74,8 @@ For fastest solo mining, keep `master_turbo_when_solo` enabled and increase `mas
 values mine harder when no I2C slaves are online, but web dashboard and OTA updates will respond less often.
 
 On dual-core ESP32 boards, including ESP32-S3, `master_use_second_core` starts a second hash lane on the other core.
-The main loop still services WiFi, web, OTA, and I2C, while the extra core searches the alternate nonce lane.
+The ESP32 path now follows the official ESP miner style more closely: each active ESP mining lane uses its own pool
+connection and job. The main lane still services WiFi, web, OTA, and I2C, while the second lane runs on the other core.
 
 For AVR slave speed, keep `i2c_wire_clock` at `100000` first. `400000` can work with short wiring and good pullups, but Uno/Nano boards often become less reliable at that speed.
 
@@ -91,6 +92,7 @@ Keep all files in that folder:
 ```text
 DuinoCoin_Esp_Async_Master.ino
 DuinoCoin_MasterMiner.ino
+DuinoCoin_MasterMiner.h
 DuinoCoin_Clients.ino
 DuinoCoin_Wire.ino
 DuinoCoin_Pool.ino
