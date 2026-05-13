@@ -58,6 +58,7 @@ unsigned long masterDifficulty = 0;
 unsigned long masterJobStartMicros = 0;
 unsigned long masterStateTime = 0;
 unsigned long masterLastConnectAttempt = 0;
+unsigned long masterMainHashes = 0;
 unsigned long masterShares = 0;
 unsigned long masterAcceptedShares = 0;
 float masterHashrate = 0.0;
@@ -205,6 +206,7 @@ bool masterMiner_parseJob(String job)
 
   masterBaseSha1.reset().write((const unsigned char*)masterLastBlockHash.c_str(), masterLastBlockHash.length());
   masterCounter.reset();
+  masterMainHashes = 0;
   #if DUCO_ESP32
     masterWorkerJobActive = false;
     masterWorkerFound = false;
@@ -220,11 +222,13 @@ bool masterMiner_parseJob(String job)
   return true;
 }
 
-void masterMiner_submit(unsigned long result, unsigned long elapsedMicros, unsigned long hashesDone)
+void masterMiner_submit(unsigned long result, unsigned long elapsedMicros, unsigned long submitHashes, unsigned long displayHashes)
 {
   float elapsedSeconds = elapsedMicros * .000001f;
-  unsigned long reportedHashes = hashesDone > 0 ? hashesDone : result;
-  masterHashrate = elapsedSeconds > 0 ? reportedHashes / elapsedSeconds : 0;
+  unsigned long submitWork = submitHashes > 0 ? submitHashes : result;
+  unsigned long displayWork = displayHashes > 0 ? displayHashes : submitWork;
+  float submitHashrate = elapsedSeconds > 0 ? submitWork / elapsedSeconds : 0;
+  masterHashrate = elapsedSeconds > 0 ? displayWork / elapsedSeconds : 0;
   masterShares++;
   #if DUCO_ESP32
     masterWorkerJobActive = false;
@@ -232,7 +236,7 @@ void masterMiner_submit(unsigned long result, unsigned long elapsedMicros, unsig
 
   String identifier = String(rigIdentifier) + " [M]";
   String payload = String(result) + "," +
-                   String(masterHashrate, 2) + "," +
+                   String(submitHashrate, 2) + "," +
                    MASTER_MINER_NAME + "," +
                    identifier + "," +
                    masterDucoId + "\n";
@@ -247,6 +251,11 @@ void masterMiner_submit(unsigned long result, unsigned long elapsedMicros, unsig
 void masterMiner_submit(unsigned long result, unsigned long elapsedMicros)
 {
   masterMiner_submit(result, elapsedMicros, result);
+}
+
+void masterMiner_submit(unsigned long result, unsigned long elapsedMicros, unsigned long hashesDone)
+{
+  masterMiner_submit(result, elapsedMicros, hashesDone, hashesDone);
 }
 
 unsigned long masterMiner_hashBudget()
@@ -281,8 +290,8 @@ void masterMiner_hashBatch()
   #if DUCO_ESP32
     if (masterMiner_parallelEnabled()) {
       if (masterWorkerFound) {
-        unsigned long hashesDone = ((unsigned long)((unsigned int)masterCounter) / 2UL) + masterWorkerHashes;
-        masterMiner_submit(masterWorkerResult, micros() - masterJobStartMicros, hashesDone);
+        unsigned long totalHashes = masterMainHashes + masterWorkerHashes;
+        masterMiner_submit(masterWorkerResult, micros() - masterJobStartMicros, masterWorkerHashes, totalHashes);
         blink(BLINK_SHARE_FOUND);
         return;
       }
@@ -290,10 +299,11 @@ void masterMiner_hashBatch()
       while (masterCounter < masterDifficulty) {
         DSHA1 ctx = masterBaseSha1;
         ctx.write((const unsigned char*)masterCounter.c_str(), masterCounter.strlen()).finalize(masterHash);
+        masterMainHashes++;
 
         if (memcmp(masterExpectedHash, masterHash, 20) == 0) {
-          unsigned long hashesDone = ((unsigned long)((unsigned int)masterCounter) / 2UL) + masterWorkerHashes;
-          masterMiner_submit(masterCounter, micros() - masterJobStartMicros, hashesDone);
+          unsigned long totalHashes = masterMainHashes + masterWorkerHashes;
+          masterMiner_submit(masterCounter, micros() - masterJobStartMicros, masterMainHashes, totalHashes);
           blink(BLINK_SHARE_FOUND);
           return;
         }
@@ -301,8 +311,8 @@ void masterMiner_hashBatch()
         MASTER_COUNTER_STEP2(masterCounter);
 
         if (masterWorkerFound) {
-          unsigned long hashesDone = ((unsigned long)((unsigned int)masterCounter) / 2UL) + masterWorkerHashes;
-          masterMiner_submit(masterWorkerResult, micros() - masterJobStartMicros, hashesDone);
+          unsigned long totalHashes = masterMainHashes + masterWorkerHashes;
+          masterMiner_submit(masterWorkerResult, micros() - masterJobStartMicros, masterWorkerHashes, totalHashes);
           blink(BLINK_SHARE_FOUND);
           return;
         }
