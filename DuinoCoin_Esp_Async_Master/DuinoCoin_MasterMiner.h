@@ -254,7 +254,7 @@ void masterMiner_submit(unsigned long result, unsigned long elapsedMicros, unsig
   masterHashrate = elapsedSeconds > 0 ? displayWork / elapsedSeconds : 0;
   masterShares++;
 
-  String identifier = String(rigIdentifier) + " [M]";
+  String identifier = String(rigIdentifier);
   String payload = String(result) + "," +
                    String(submitHashrate, 2) + "," +
                    MASTER_MINER_NAME + "," +
@@ -424,7 +424,7 @@ void masterLane_submit(MasterMiningLane &lane, unsigned long result, unsigned lo
   lane.hashrate = elapsedSeconds > 0 ? result / elapsedSeconds : 0;
   lane.shares++;
 
-  String identifier = String(rigIdentifier) + " [M]";
+  String identifier = String(rigIdentifier);
   String payload = String(result) + "," +
                    String(lane.hashrate, 2) + "," +
                    MASTER_MINER_NAME + "," +
