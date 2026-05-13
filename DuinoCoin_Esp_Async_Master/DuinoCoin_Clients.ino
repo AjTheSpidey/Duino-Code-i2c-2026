@@ -319,10 +319,10 @@ void clients_sendJobDone(byte i)
 
     String identifier = String(rigIdentifier) + " " + "[" + String(i + 1) + "]";
 
-    clients[i].print(String(job) + SEP_TOKEN + String(HashRate, 2) + SEP_TOKEN + MINER + SEP_TOKEN + String(identifier) + id);
+    clients[i].print(String(job) + SEP_TOKEN + String(HashRate, 2) + SEP_TOKEN + slave_miner_name + SEP_TOKEN + String(identifier) + id);
 
     Serial.print("[" + String(i) + "]");
-    Serial.println(String(job) + SEP_TOKEN + String(HashRate, 2) + SEP_TOKEN+ MINER + SEP_TOKEN + String(identifier) + id);
+    Serial.println(String(job) + SEP_TOKEN + String(HashRate, 2) + SEP_TOKEN+ slave_miner_name + SEP_TOKEN + String(identifier) + id);
 
     clients_state(i, DUINO_STATE_JOB_DONE_WAIT);
   }

@@ -272,6 +272,13 @@ bool masterMiner_soloMode()
   return !miningMode_hasI2C() || clients_slaveCount() == 0;
 }
 
+bool masterMiner_enabledNow()
+{
+  if (master_only) return true;
+  if (!master_mines_with_i2c_slaves && miningMode_hasI2C() && clients_slaveCount() > 0) return false;
+  return true;
+}
+
 bool masterMiner_parallelEnabled()
 {
   #if DUCO_ESP32
@@ -444,6 +451,13 @@ void masterMiner_startTask()
 
 void masterMiner_loop()
 {
+  if (!masterMiner_enabledNow()) {
+    if (masterClient.connected() || masterState != MASTER_STATE_CONNECT) {
+      masterMiner_stop();
+    }
+    return;
+  }
+
   if (WiFi.status() != WL_CONNECTED) {
     masterMiner_stop();
     return;
@@ -510,6 +524,10 @@ void masterMiner_loop()
 String masterMiner_status()
 {
   String str = "M ";
+  if (!masterMiner_enabledNow()) {
+    str += "paused";
+    return str;
+  }
   str += masterClient.connected() ? String(masterHashrate / 1000.0, 1) + "kH/s" : "offline";
   str += " ";
   str += masterAcceptedShares;

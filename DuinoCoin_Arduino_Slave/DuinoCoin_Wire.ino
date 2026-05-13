@@ -8,11 +8,10 @@
 #include <Wire.h>
 #include <DuinoCoin.h>        // https://github.com/ricaun/arduino-DuinoCoin
 #include <ArduinoUniqueID.h>  // https://github.com/ricaun/ArduinoUniqueID
-#include <StreamString.h>     // https://github.com/ricaun/StreamJoin
 
 byte i2c = 1;
-StreamString bufferReceive;
-StreamString bufferRequest;
+String bufferReceive = "";
+String bufferRequest = "";
 
 String get_BOARD_TYPE();
 
@@ -55,33 +54,40 @@ void receiveEvent(int howMany) {
   }
   while (Wire.available()) {
     char c = Wire.read();
-    bufferReceive.write(c);
+    bufferReceive += c;
   }
 }
 
 void requestEvent() {
   char c = '\n';
-  if (bufferRequest.available() > 0 && bufferRequest.indexOf('\n') != -1)
-  //if (bufferRequest.length() > 0)
+  if (bufferRequest.length() > 0 && bufferRequest.indexOf('\n') != -1)
   {
-    c = bufferRequest.read();
+    c = bufferRequest[0];
+    bufferRequest.remove(0, 1);
   }
   Wire.write(c);
 }
 
 bool DuinoCoin_loop()
 {
-  if (bufferReceive.available() > 0 && bufferReceive.indexOf('\n') != -1) {
+  int endLine = bufferReceive.indexOf('\n');
+  if (bufferReceive.length() > 0 && endLine != -1) {
 
     Serial.print(F("Job: "));
     Serial.print(bufferReceive);
 
-    // Read last block hash
-    String lastblockhash = bufferReceive.readStringUntil(',');
-    // Read expected hash
-    String newblockhash = bufferReceive.readStringUntil(',');
-    // Read difficulty
-    unsigned int difficulty = bufferReceive.readStringUntil('\n').toInt();
+    String jobLine = bufferReceive.substring(0, endLine);
+    bufferReceive.remove(0, endLine + 1);
+
+    int firstComma = jobLine.indexOf(',');
+    int secondComma = jobLine.indexOf(',', firstComma + 1);
+    if (firstComma == -1 || secondComma == -1) {
+      return false;
+    }
+
+    String lastblockhash = jobLine.substring(0, firstComma);
+    String newblockhash = jobLine.substring(firstComma + 1, secondComma);
+    unsigned int difficulty = jobLine.substring(secondComma + 1).toInt();
     // Start time measurement
     unsigned long startTime = micros();
     // Call DUCO-S1A hasher
@@ -92,8 +98,7 @@ bool DuinoCoin_loop()
     // Calculate elapsed time
     unsigned long elapsedTime = endTime - startTime;
     // Send result back to the program with share time
-    while (bufferRequest.available()) bufferRequest.read();
-    bufferRequest.print(String(ducos1result) + "," + String(elapsedTime) + "," + String(get_DUCOID()) + "\n");
+    bufferRequest = String(ducos1result) + "," + String(elapsedTime) + "," + String(get_DUCOID()) + "\n";
     
     Serial.print(F("Done "));
     Serial.print(String(ducos1result) + "," + String(elapsedTime) + "," + String(get_DUCOID()) + "\n");

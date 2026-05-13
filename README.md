@@ -2,7 +2,7 @@
 
 Duino-Code I2C 2026 is a Duino-Coin I2C mining setup for mixed small-board rigs.
 
-The main build is an ESP8266/ESP32 master that mines on its own and also watches the I2C bus for AVR miners. If no slaves are present, the ESP keeps mining as a normal standalone miner. If slaves are plugged in later, it detects them and starts feeding them jobs while the ESP continues mining locally.
+The main build is an ESP8266/ESP32 master that watches the I2C bus for AVR miners. If no slaves are present, the ESP mines as a normal standalone miner. If slaves are plugged in later, it detects them and starts feeding them jobs. By default the ESP pauses its own miner while AVR slaves are active, which keeps ESP8266 rigs closer to the older I2C miner speed and ping.
 
 ## What is included
 
@@ -15,15 +15,17 @@ The main build is an ESP8266/ESP32 master that mines on its own and also watches
 
 ## ESP master behavior
 
-The ESP master always mines. I2C is automatic.
+The ESP master is automatic.
 
 ```text
 No slaves detected  -> ESP mines mostly like a normal standalone ESP miner
-Slaves detected     -> ESP mines and also controls the AVR I2C miners
+Slaves detected     -> ESP controls the AVR I2C miners
 Slaves removed      -> ESP returns to mostly solo mining
 ```
 
 The I2C scan is cached so the sketch does not waste time probing every address on every loop.
+
+Set `master_mines_with_i2c_slaves` to `true` if you want ESP + AVR mining at the same time. On ESP8266, this can lower AVR hashrate and add ping because WiFi, I2C, and hashing all share one core.
 
 ## Easy settings
 
@@ -49,6 +51,7 @@ const char* wifi_3_pass = "";
 
 const bool master_only = false;
 const bool auto_i2c_slaves = true;
+const bool master_mines_with_i2c_slaves = false;
 const bool master_turbo_when_solo = true;
 const bool master_use_second_core = true;
 const byte max_avr_miners = 16;
@@ -56,9 +59,10 @@ const unsigned long master_hash_us_master_only = 1000000;
 const unsigned long master_hash_us_single = 250000;
 const unsigned long master_hash_us_shared = 20000;
 const unsigned long i2c_scan_empty_ms = 15000;
-const unsigned long i2c_scan_active_ms = 5000;
-const unsigned long i2c_read_timeout_ms = 8;
-const unsigned long i2c_wire_clock = 400000;
+const unsigned long i2c_scan_active_ms = 30000;
+const unsigned long i2c_read_timeout_ms = 60;
+const unsigned long i2c_wire_clock = 100000;
+const char* slave_miner_name = "Official AVR Miner 4.3";
 ```
 
 Three WiFi profiles are supported. If all WiFi names are empty, the ESP tries saved WiFi credentials.
@@ -71,6 +75,8 @@ values mine harder when no I2C slaves are online, but web dashboard and OTA upda
 
 On dual-core ESP32 boards, including ESP32-S3, `master_use_second_core` starts a second hash lane on the other core.
 The main loop still services WiFi, web, OTA, and I2C, while the extra core searches the alternate nonce lane.
+
+For AVR slave speed, keep `i2c_wire_clock` at `100000` first. `400000` can work with short wiring and good pullups, but Uno/Nano boards often become less reliable at that speed.
 
 ## ESP master upload files
 
@@ -128,11 +134,11 @@ Libraries commonly needed:
 ```text
 DuinoCoin
 ArduinoUniqueID
-StreamString
 Wire
 ```
 
 The slave reports a board tag in its ID when the Arduino core exposes it, for example `UNO`, `NANO`, or `MEGA2560`.
+It does not need the older StreamString/StreamJoin helper library.
 
 ## I2C wiring notes
 
