@@ -33,6 +33,16 @@ const byte MASTER_STATE_RESULT_WAIT = 5;
 
 WiFiClient masterClient;
 byte masterState = MASTER_STATE_CONNECT;
+#if DUCO_ESP32
+TaskHandle_t masterMinerTaskHandle = NULL;
+bool masterMinerSecondCore = false;
+volatile bool masterWorkerJobActive = false;
+volatile bool masterWorkerFound = false;
+volatile bool masterWorkerDone = false;
+volatile unsigned long masterWorkerResult = 0;
+volatile unsigned long masterWorkerHashes = 0;
+volatile unsigned long masterWorkerJobId = 0;
+#endif
 String masterBuffer = "";
 String masterLastBlockHash = "";
 String masterExpectedHashString = "";
@@ -40,6 +50,7 @@ uint8_t masterExpectedHash[20];
 uint8_t masterHash[20];
 DSHA1 masterBaseSha1;
 Counter<10> masterCounter;
+unsigned long masterCounterValue = 0;
 unsigned long masterDifficulty = 0;
 unsigned long masterJobStartMicros = 0;
 unsigned long masterStateTime = 0;
@@ -131,6 +142,9 @@ String masterMiner_readLine()
 
 void masterMiner_stop()
 {
+  #if DUCO_ESP32
+    masterWorkerJobActive = false;
+  #endif
   masterClient.stop();
   masterBuffer = "";
   masterMiner_state(MASTER_STATE_CONNECT);
@@ -188,15 +202,28 @@ bool masterMiner_parseJob(String job)
 
   masterBaseSha1.reset().write((const unsigned char*)masterLastBlockHash.c_str(), masterLastBlockHash.length());
   masterCounter.reset();
+  masterCounterValue = 0;
+  #if DUCO_ESP32
+    masterWorkerFound = false;
+    masterWorkerDone = false;
+    masterWorkerResult = 0;
+    masterWorkerHashes = 0;
+    masterWorkerJobId++;
+    masterWorkerJobActive = true;
+  #endif
   masterJobStartMicros = micros();
   return true;
 }
 
-void masterMiner_submit(unsigned long result, unsigned long elapsedMicros)
+void masterMiner_submit(unsigned long result, unsigned long elapsedMicros, unsigned long hashesDone)
 {
   float elapsedSeconds = elapsedMicros * .000001f;
-  masterHashrate = elapsedSeconds > 0 ? result / elapsedSeconds : 0;
+  unsigned long reportedHashes = hashesDone > 0 ? hashesDone : result;
+  masterHashrate = elapsedSeconds > 0 ? reportedHashes / elapsedSeconds : 0;
   masterShares++;
+  #if DUCO_ESP32
+    masterWorkerJobActive = false;
+  #endif
 
   String identifier = String(rigIdentifier) + " [M]";
   String payload = String(result) + "," +
@@ -212,6 +239,11 @@ void masterMiner_submit(unsigned long result, unsigned long elapsedMicros)
   masterMiner_state(MASTER_STATE_RESULT_WAIT);
 }
 
+void masterMiner_submit(unsigned long result, unsigned long elapsedMicros)
+{
+  masterMiner_submit(result, elapsedMicros, result);
+}
+
 unsigned long masterMiner_hashBudget()
 {
   if (!miningMode_hasI2C()) return master_hash_us_single;
@@ -224,11 +256,72 @@ bool masterMiner_soloMode()
   return !miningMode_hasI2C() || clients_slaveCount() == 0;
 }
 
+void masterMiner_hashCandidate(unsigned long candidate, uint8_t* output)
+{
+  char candidateBuffer[11];
+  ultoa(candidate, candidateBuffer, 10);
+  DSHA1 ctx = masterBaseSha1;
+  ctx.write((const unsigned char*)candidateBuffer, strlen(candidateBuffer)).finalize(output);
+}
+
+bool masterMiner_parallelEnabled()
+{
+  #if DUCO_ESP32
+    return masterMinerSecondCore && masterWorkerJobActive;
+  #else
+    return false;
+  #endif
+}
+
 void masterMiner_hashBatch()
 {
   unsigned long sliceStart = micros();
   unsigned long hashBudget = masterMiner_hashBudget();
   bool soloMode = masterMiner_soloMode();
+
+  #if DUCO_ESP32
+    if (masterMiner_parallelEnabled()) {
+      if (masterWorkerFound) {
+        unsigned long hashesDone = (masterCounterValue / 2UL) + masterWorkerHashes;
+        masterMiner_submit(masterWorkerResult, micros() - masterJobStartMicros, hashesDone);
+        blink(BLINK_SHARE_FOUND);
+        return;
+      }
+
+      while (masterCounterValue < masterDifficulty) {
+        masterMiner_hashCandidate(masterCounterValue, masterHash);
+
+        if (memcmp(masterExpectedHash, masterHash, 20) == 0) {
+          unsigned long hashesDone = (masterCounterValue / 2UL) + masterWorkerHashes;
+          masterMiner_submit(masterCounterValue, micros() - masterJobStartMicros, hashesDone);
+          blink(BLINK_SHARE_FOUND);
+          return;
+        }
+
+        masterCounterValue += 2;
+
+        if (masterWorkerFound) {
+          unsigned long hashesDone = (masterCounterValue / 2UL) + masterWorkerHashes;
+          masterMiner_submit(masterWorkerResult, micros() - masterJobStartMicros, hashesDone);
+          blink(BLINK_SHARE_FOUND);
+          return;
+        }
+
+        if (micros() - sliceStart >= hashBudget) {
+          handleSystemEvents();
+          if (!soloMode || !master_turbo_when_solo) break;
+          sliceStart = micros();
+        }
+      }
+
+      if (masterCounterValue >= masterDifficulty && masterWorkerDone && !masterWorkerFound) {
+        masterWorkerJobActive = false;
+        Serial.println("[M]No result found in job range. Requesting a fresh job.");
+        masterMiner_state(MASTER_STATE_JOB_REQUEST);
+      }
+      return;
+    }
+  #endif
 
   while (masterCounter < masterDifficulty) {
     DSHA1 ctx = masterBaseSha1;
@@ -263,6 +356,80 @@ void masterMiner_setup()
   masterBaseSha1.warmup();
   masterLastConnectAttempt = millis() - MASTER_CONNECT_EVERY;
   masterMiner_state(MASTER_STATE_CONNECT);
+}
+
+bool masterMiner_usesDedicatedTask()
+{
+  return false;
+}
+
+#if DUCO_ESP32
+void masterMiner_task(void* parameter)
+{
+  (void)parameter;
+  for (;;) {
+    if (!masterWorkerJobActive || masterState != MASTER_STATE_HASHING || masterWorkerFound || masterWorkerDone) {
+      vTaskDelay(1);
+      continue;
+    }
+
+    unsigned long jobId = masterWorkerJobId;
+    unsigned long candidate = 1;
+    uint8_t workerHash[20];
+
+    while (masterWorkerJobActive &&
+           !masterWorkerFound &&
+           masterState == MASTER_STATE_HASHING &&
+           jobId == masterWorkerJobId &&
+           candidate < masterDifficulty) {
+      masterMiner_hashCandidate(candidate, workerHash);
+      masterWorkerHashes++;
+
+      if (memcmp(masterExpectedHash, workerHash, 20) == 0) {
+        masterWorkerResult = candidate;
+        masterWorkerFound = true;
+        break;
+      }
+
+      candidate += 2;
+      if ((candidate & 0x3F) == 1) {
+        taskYIELD();
+      }
+    }
+
+    if (jobId == masterWorkerJobId && candidate >= masterDifficulty) {
+      masterWorkerDone = true;
+    }
+  }
+}
+#endif
+
+void masterMiner_startTask()
+{
+  #if DUCO_ESP32
+    if (!master_use_second_core || ESP.getChipCores() < 2) return;
+    if (masterMinerTaskHandle != NULL) return;
+
+    int loopCore = xPortGetCoreID();
+    int miningCore = loopCore == 0 ? 1 : 0;
+    BaseType_t created = xTaskCreatePinnedToCore(
+      masterMiner_task,
+      "duco-hash2",
+      6144,
+      NULL,
+      1,
+      &masterMinerTaskHandle,
+      miningCore
+    );
+
+    if (created == pdPASS) {
+      masterMinerSecondCore = true;
+      Serial.println(String("[M]Second-core hash worker started on core ") + String(miningCore) +
+                     " of " + String(ESP.getChipCores()));
+    } else {
+      Serial.println("[M]Second-core hash worker failed; using one hash lane.");
+    }
+  #endif
 }
 
 void masterMiner_loop()

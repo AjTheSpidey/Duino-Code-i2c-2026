@@ -14,7 +14,9 @@ void Wire_send(byte address, String message);
 String wire_readLine(int address);
 boolean wire_runEvery(unsigned long interval);
 void masterMiner_setup();
+void masterMiner_startTask();
 void masterMiner_loop();
+bool masterMiner_usesDedicatedTask();
 String masterMiner_status();
 bool miningMode_hasI2C();
 void clients_scanSlaves(bool force);
@@ -45,11 +47,14 @@ const char* wifi_3_pass = "";          // Backup WiFi password
 
 const bool auto_i2c_slaves = true;      // Master always mines; I2C slaves are detected automatically
 const bool master_turbo_when_solo = true; // No slaves online: hash continuously and only pause for WiFi/OTA
+const bool master_use_second_core = true; // ESP32/S3 dual-core: mine on a dedicated FreeRTOS task
 const byte max_avr_miners = 16;        // More than 10 is supported; 16 is safer for ESP RAM
 const unsigned long master_hash_us_single = 250000; // Full-power solo slice when no I2C slaves are online
 const unsigned long master_hash_us_shared = 20000;  // Shared slice when ESP and I2C slaves mine together
 const unsigned long i2c_scan_empty_ms = 15000;      // Empty-bus scan delay; bigger = faster solo mining
 const unsigned long i2c_scan_active_ms = 5000;      // Active-bus scan delay; smaller = faster slave detection
+const unsigned long i2c_read_timeout_ms = 8;        // Short polling timeout keeps I2C from stalling mining
+const unsigned long i2c_wire_clock = 400000;        // Fast-mode I2C; use 100000 if long wires get unstable
 // ----------------------------------------------------------- //
 
 struct WifiCredential {
@@ -250,6 +255,7 @@ void setup() {
 
   UpdatePool();
   masterMiner_setup();
+  masterMiner_startTask();
 
   blink(BLINK_SETUP_COMPLETE);
 }
@@ -257,7 +263,7 @@ void setup() {
 void loop() {
   ArduinoOTA.handle();
   if (miningMode_hasI2C()) clients_loop();
-  masterMiner_loop();
+  if (!masterMiner_usesDedicatedTask()) masterMiner_loop();
   if (runEvery(1000))
   {
     String status = clients_string() + " " + masterMiner_status();

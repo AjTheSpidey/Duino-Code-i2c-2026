@@ -42,12 +42,20 @@ void requestEvent() {
 }
 
 String boardId() {
+  #if defined(CORE_CM7) || defined(CORE_CM4)
+    return "STM32-DUAL";
+  #elif defined(ARDUINO_NUCLEO_H745ZI_Q)
+    return "STM32H745-2C";
+  #elif defined(ARDUINO_PORTENTA_H7_M7) || defined(ARDUINO_PORTENTA_H7_M4)
+    return "STM32H7-2C";
+  #else
   #if defined(ARDUINO_GENERIC_F103C8TX) || defined(ARDUINO_BLUEPILL_F103C8)
     return "STM32F103";
   #elif defined(ARDUINO_ARCH_STM32)
     return "STM32";
   #else
     return "MCU";
+  #endif
   #endif
 }
 

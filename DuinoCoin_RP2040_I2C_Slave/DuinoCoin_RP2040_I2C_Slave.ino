@@ -8,9 +8,9 @@ String responseBuffer = "\n";
 
 String boardId() {
   #if defined(ARDUINO_ARCH_RP2040)
-    return "RP2040";
+    return "RP2040-2C";
   #elif defined(ARDUINO_RASPBERRY_PI_PICO)
-    return "PICO";
+    return "PICO-2C";
   #else
     return "MCU";
   #endif

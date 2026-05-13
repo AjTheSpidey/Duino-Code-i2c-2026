@@ -49,17 +49,23 @@ const char* wifi_3_pass = "";
 
 const bool auto_i2c_slaves = true;
 const bool master_turbo_when_solo = true;
+const bool master_use_second_core = true;
 const byte max_avr_miners = 16;
 const unsigned long master_hash_us_single = 250000;
 const unsigned long master_hash_us_shared = 20000;
 const unsigned long i2c_scan_empty_ms = 15000;
 const unsigned long i2c_scan_active_ms = 5000;
+const unsigned long i2c_read_timeout_ms = 8;
+const unsigned long i2c_wire_clock = 400000;
 ```
 
 Three WiFi profiles are supported. If all WiFi names are empty, the ESP tries saved WiFi credentials.
 
 For fastest solo mining, keep `master_turbo_when_solo` enabled and increase `master_hash_us_single` carefully. Bigger
 values mine harder when no I2C slaves are online, but web dashboard and OTA updates will respond less often.
+
+On dual-core ESP32 boards, including ESP32-S3, `master_use_second_core` starts a second hash lane on the other core.
+The main loop still services WiFi, web, OTA, and I2C, while the extra core searches the alternate nonce lane.
 
 ## ESP master upload files
 
@@ -93,7 +99,8 @@ ESP8266 and ESP32 OLED driver for SSD1306 displays by ThingPulse
 StreamString
 ```
 
-The ESP master was compile-checked with `esp32:esp32:esp32` and `esp8266:esp8266:nodemcuv2`.
+The ESP master was compile-checked with `esp32:esp32:esp32`, `esp32:esp32:esp32s3`, and
+`esp8266:esp8266:nodemcuv2`.
 
 ## AVR slave upload files
 

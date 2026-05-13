@@ -17,7 +17,6 @@
 #define SCL 22
 #endif
 
-#define WIRE_CLOCK 100000
 #define WIRE_BUFFER_MAX 32
 #define WIRE_CHUNK (WIRE_BUFFER_MAX - 1)
 #define WIRE_SCAN_MAX (max_avr_miners + 1)
@@ -35,7 +34,7 @@ void wire_start()
   static bool started = false;
   if (started) return;
   Wire.begin(SDA, SCL);
-  Wire.setClock(WIRE_CLOCK);
+  Wire.setClock(i2c_wire_clock);
   started = true;
 }
 
@@ -100,12 +99,11 @@ void Wire_send(byte address, String message)
 
 String wire_readLine(int address)
 {
-  wire_runEvery(0);
   char end = '\n';
   String str = "";
-  boolean done = false;
+  unsigned long start = millis();
   wire_start();
-  while (!done)
+  while (millis() - start < i2c_read_timeout_ms)
   {
     Wire.requestFrom(address, 1);
     if (Wire.available())
@@ -114,12 +112,11 @@ String wire_readLine(int address)
       //Serial.print(c);
       if (c == end)
       {
-        done = true;
         break;
       }
       str += c;
     }
-    if (wire_runEvery(2000)) break;
+    yield();
   }
   //str += end;
   return str;
