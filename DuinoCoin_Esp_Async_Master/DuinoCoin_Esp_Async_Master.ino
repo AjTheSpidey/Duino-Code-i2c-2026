@@ -45,12 +45,17 @@ const char* wifi_2_pass = "";          // Backup WiFi password
 const char* wifi_3_name = "";          // Backup WiFi SSID
 const char* wifi_3_pass = "";          // Backup WiFi password
 
-const bool master_only = false;         // True = maximum-effort standalone master miner, no I2C/web/OLED/OTA
-const bool auto_i2c_slaves = true;      // Master always mines; I2C slaves are detected automatically
+// Main mode switch:
+// false = normal automatic mode: master mines and auto-detects I2C slaves
+// true  = maximum-effort standalone master miner: no I2C, OLED, web dashboard, or OTA
+const bool master_only = false;
+
+// Advanced override. Leave true unless you intentionally want to disable I2C while not using master_only.
+const bool auto_i2c_slaves = true;
 const bool master_turbo_when_solo = true; // No slaves online: hash continuously and only pause for WiFi/OTA
 const bool master_use_second_core = true; // ESP32/S3 dual-core: run a second hash lane on the other core
 const byte max_avr_miners = 16;        // More than 10 is supported; 16 is safer for ESP RAM
-const unsigned long master_hash_us_master_only = 1000000; // Bigger = fewer service breaks in master-only mode
+const unsigned long master_hash_us_master_only = 1000000; // Maximum-effort standalone slice
 const unsigned long master_hash_us_single = 250000; // Full-power solo slice when no I2C slaves are online
 const unsigned long master_hash_us_shared = 20000;  // Shared slice when ESP and I2C slaves mine together
 const unsigned long i2c_scan_empty_ms = 15000;      // Empty-bus scan delay; bigger = faster solo mining
