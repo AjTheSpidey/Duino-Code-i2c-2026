@@ -1,5 +1,7 @@
 import hashlib
 import json
+import multiprocessing
+import os
 import socket
 import threading
 import time
@@ -77,21 +79,25 @@ class PoolClient:
 
 
 class SlaveState:
-    def __init__(self):
-        self.lock = threading.Lock()
+    def __init__(self, shared_count=None):
         self.addresses = []
+        self.shared_count = shared_count
 
     def set(self, addresses):
-        with self.lock:
-            self.addresses = list(addresses)
+        self.addresses = list(addresses)
+        if self.shared_count is not None:
+            with self.shared_count.get_lock():
+                self.shared_count.value = len(addresses)
 
     def any(self):
-        with self.lock:
-            return bool(self.addresses)
+        if self.shared_count is not None:
+            return self.shared_count.value > 0
+        return bool(self.addresses)
 
     def count(self):
-        with self.lock:
-            return len(self.addresses)
+        if self.shared_count is not None:
+            return self.shared_count.value
+        return len(self.addresses)
 
 
 class I2CBus:
@@ -150,24 +156,28 @@ def hash_job(last_hash, expected_hash, difficulty, yield_every):
         if digest == expected:
             elapsed = max(time.perf_counter() - start, 0.000001)
             return nonce, nonce / elapsed
-        if nonce and nonce % yield_every == 0:
+        if yield_every and nonce and nonce % yield_every == 0:
             time.sleep(0)
     return 0, 0.0
 
 
-def local_miner(cfg, slave_state):
-    client = PoolClient("self")
+def local_miner(cfg, slave_state, worker_id=0):
+    label = "self" if worker_id == 0 else f"self-{worker_id}"
+    client = PoolClient(label)
     while True:
         try:
             job = client.request_job(cfg["user"], cfg["local_job_type"], cfg.get("mining_key", ""))
             last_hash, expected_hash, raw_diff = job.split(",", 2)
             difficulty = int(raw_diff) * 100 + 1
-            yield_every = cfg["hash_yield_shared"] if slave_state.any() else cfg["hash_yield_single"]
+            if cfg.get("master_only", False):
+                yield_every = cfg.get("hash_yield_master_only", 0)
+            else:
+                yield_every = cfg["hash_yield_shared"] if slave_state.any() else cfg["hash_yield_single"]
             nonce, hashrate = hash_job(last_hash, expected_hash, difficulty, yield_every)
-            payload = f"{nonce},{hashrate:.2f},Raspberry Pi I2C Master,{cfg['rig']} [M],DUCOIDRPI"
-            print(f"[self] {payload} -> {client.submit(payload)}")
+            payload = f"{nonce},{hashrate:.2f},Raspberry Pi I2C Master,{cfg['rig']} [M{worker_id}],DUCOIDRPI{worker_id}"
+            print(f"[{label}] {payload} -> {client.submit(payload)}")
         except Exception as exc:
-            print(f"[self] reconnecting after: {exc}")
+            print(f"[{label}] reconnecting after: {exc}")
             client.close()
             time.sleep(3)
 
@@ -210,19 +220,33 @@ def i2c_controller(cfg, slave_state):
 
 def main():
     cfg = load_config()
-    slave_state = SlaveState()
+    shared_slave_count = multiprocessing.Value("i", 0)
+    slave_state = SlaveState(shared_slave_count)
+    master_only = cfg.get("master_only", False)
+    use_all_cores = cfg.get("use_all_cores", True)
+    default_workers = os.cpu_count() if use_all_cores else 1
+    local_workers = max(1, int(cfg.get("local_mining_processes", default_workers or 1)))
+
+    workers = [
+        multiprocessing.Process(target=local_miner, args=(cfg, slave_state, worker_id), daemon=True)
+        for worker_id in range(local_workers)
+    ]
 
     threads = [
-        threading.Thread(target=local_miner, args=(cfg, slave_state), daemon=True),
         threading.Thread(target=i2c_controller, args=(cfg, slave_state), daemon=True),
     ]
 
+    if master_only or not cfg.get("auto_i2c_slaves", True):
+        threads = []
+
+    for worker in workers:
+        worker.start()
     for thread in threads:
         thread.start()
 
     while True:
         time.sleep(5)
-        print(f"[status] i2c_slaves={slave_state.count()}")
+        print(f"[status] local_workers={local_workers} master_only={master_only} i2c_slaves={slave_state.count()}")
 
 
 if __name__ == "__main__":

@@ -18,6 +18,8 @@ Recommended stable approach:
 - Use Raspberry Pi as the root master.
 - Give each ESP sub-master a serial or WiFi API instead of making it an I2C slave.
 - Keep each sub-master responsible for its own local AVR I2C chain.
+- For maximum hashrate sub-masters, set `master_only = true` in the ESP master sketch and let the root only poll status.
+- For mixed rigs, leave `master_only = false` so each sub-master can still run its local I2C AVR chain.
 
 The protocol should stay line-based:
 
@@ -32,5 +34,6 @@ Return examples:
 
 ```text
 OK,ESP32-SUBMASTER,3-SLAVES,120.4KH\n
+OK,ESP-SUBMASTER,MASTER-ONLY\n
 ```
 

@@ -246,6 +246,7 @@ void masterMiner_submit(unsigned long result, unsigned long elapsedMicros)
 
 unsigned long masterMiner_hashBudget()
 {
+  if (master_only) return master_hash_us_master_only;
   if (!miningMode_hasI2C()) return master_hash_us_single;
   if (clients_slaveCount() == 0) return master_hash_us_single;
   return master_hash_us_shared;
@@ -253,6 +254,7 @@ unsigned long masterMiner_hashBudget()
 
 bool masterMiner_soloMode()
 {
+  if (master_only) return true;
   return !miningMode_hasI2C() || clients_slaveCount() == 0;
 }
 

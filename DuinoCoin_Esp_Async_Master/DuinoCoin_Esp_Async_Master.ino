@@ -45,10 +45,12 @@ const char* wifi_2_pass = "";          // Backup WiFi password
 const char* wifi_3_name = "";          // Backup WiFi SSID
 const char* wifi_3_pass = "";          // Backup WiFi password
 
+const bool master_only = false;         // True = maximum-effort standalone master miner, no I2C/web/OLED/OTA
 const bool auto_i2c_slaves = true;      // Master always mines; I2C slaves are detected automatically
 const bool master_turbo_when_solo = true; // No slaves online: hash continuously and only pause for WiFi/OTA
-const bool master_use_second_core = true; // ESP32/S3 dual-core: mine on a dedicated FreeRTOS task
+const bool master_use_second_core = true; // ESP32/S3 dual-core: run a second hash lane on the other core
 const byte max_avr_miners = 16;        // More than 10 is supported; 16 is safer for ESP RAM
+const unsigned long master_hash_us_master_only = 1000000; // Bigger = fewer service breaks in master-only mode
 const unsigned long master_hash_us_single = 250000; // Full-power solo slice when no I2C slaves are online
 const unsigned long master_hash_us_shared = 20000;  // Shared slice when ESP and I2C slaves mine together
 const unsigned long i2c_scan_empty_ms = 15000;      // Empty-bus scan delay; bigger = faster solo mining
@@ -104,13 +106,13 @@ const char* rigIdentifier = rig;
 #define WIFI_CONNECT_TIMEOUT 15000
 
 void handleSystemEvents(void) {
-  ArduinoOTA.handle();
+  if (!master_only) ArduinoOTA.handle();
   yield();
 }
 
 bool miningMode_hasI2C()
 {
-  return auto_i2c_slaves;
+  return !master_only && auto_i2c_slaves;
 }
 
 void SetupWifi() {
@@ -240,18 +242,18 @@ void setup() {
     setCpuFrequencyMhz(240);
   #endif
 
-  oled_setup();
+  if (!master_only) oled_setup();
 
   if (miningMode_hasI2C()) {
     wire_setup();
     clients_scanSlaves(true);
   }
   SetupWifi();
-  SetupOTA();
+  if (!master_only) SetupOTA();
 
-  oled_display(WiFi.localIP().toString() + "\n" + String(ESP.getFreeHeap()) + "\n" + clients_string());
+  if (!master_only) oled_display(WiFi.localIP().toString() + "\n" + String(ESP.getFreeHeap()) + "\n" + clients_string());
 
-  server_setup();
+  if (!master_only) server_setup();
 
   UpdatePool();
   masterMiner_setup();
@@ -261,16 +263,18 @@ void setup() {
 }
 
 void loop() {
-  ArduinoOTA.handle();
+  if (!master_only) ArduinoOTA.handle();
   if (miningMode_hasI2C()) clients_loop();
   if (!masterMiner_usesDedicatedTask()) masterMiner_loop();
-  if (runEvery(1000))
+  if (runEvery(master_only ? 5000 : 1000))
   {
-    String status = clients_string() + " " + masterMiner_status();
+    String status = (master_only ? "Master only" : clients_string()) + " " + masterMiner_status();
     Serial.print("[ ]");
     Serial.println(String("FreeRam: ") + String(ESP.getFreeHeap()) + " " + status);
-    ws_sendAll(String("FreeRam: ") + String(ESP.getFreeHeap()) + " - " + status);
-    oled_display(WiFi.localIP().toString() + "\n" + String(ESP.getFreeHeap()) + "\n" + status);
+    if (!master_only) {
+      ws_sendAll(String("FreeRam: ") + String(ESP.getFreeHeap()) + " - " + status);
+      oled_display(WiFi.localIP().toString() + "\n" + String(ESP.getFreeHeap()) + "\n" + status);
+    }
   }
 }
 

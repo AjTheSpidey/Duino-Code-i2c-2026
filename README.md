@@ -47,10 +47,12 @@ const char* wifi_2_pass = "";
 const char* wifi_3_name = "";
 const char* wifi_3_pass = "";
 
+const bool master_only = false;
 const bool auto_i2c_slaves = true;
 const bool master_turbo_when_solo = true;
 const bool master_use_second_core = true;
 const byte max_avr_miners = 16;
+const unsigned long master_hash_us_master_only = 1000000;
 const unsigned long master_hash_us_single = 250000;
 const unsigned long master_hash_us_shared = 20000;
 const unsigned long i2c_scan_empty_ms = 15000;
@@ -60,6 +62,9 @@ const unsigned long i2c_wire_clock = 400000;
 ```
 
 Three WiFi profiles are supported. If all WiFi names are empty, the ESP tries saved WiFi credentials.
+
+Set `master_only` to `true` when you want the ESP to behave like a maximum-effort standalone miner. That mode disables
+I2C slave control, OLED setup, web dashboard startup, and OTA handling so the master spends more time hashing.
 
 For fastest solo mining, keep `master_turbo_when_solo` enabled and increase `master_hash_us_single` carefully. Bigger
 values mine harder when no I2C slaves are online, but web dashboard and OTA updates will respond less often.
@@ -146,7 +151,8 @@ DuinoCoin_RaspberryPi_I2C_Master
 
 Python Raspberry Pi master. It has the same basic idea: local mining plus I2C slave control.
 
-The Pi version uses separate workers and separate pool connections so it keeps mining locally while it serves I2C slaves.
+The Pi version uses separate processes and separate pool connections so multi-core boards can run more local miners
+while I2C slave control stays separate. Its config also includes `master_only`.
 
 ```text
 DuinoCoin_STM32_I2C_Slave
