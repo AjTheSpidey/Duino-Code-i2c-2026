@@ -55,13 +55,13 @@ const bool master_only = false;
 
 // Advanced override. Leave true unless you intentionally want to disable I2C while not using master_only.
 const bool auto_i2c_slaves = true;
-const bool master_mines_with_i2c_slaves = false; // False gives fastest/stablest AVR I2C; true makes the ESP mine too
+const bool master_mines_with_i2c_slaves = true; // ESP mines too while slaves run; set false for fastest AVR-only I2C
 const bool master_turbo_when_solo = true; // No slaves online: hash continuously and only pause for WiFi/OTA
 const bool master_use_second_core = true; // ESP32/S3 dual-core: run a second hash lane on the other core
 const byte max_avr_miners = 16;        // More than 10 is supported; 16 is safer for ESP RAM
 const unsigned long master_hash_us_master_only = 1000000; // Maximum-effort standalone slice
 const unsigned long master_hash_us_single = 250000; // Full-power solo slice when no I2C slaves are online
-const unsigned long master_hash_us_shared = 20000;  // Shared slice when ESP and I2C slaves mine together
+const unsigned long master_hash_us_shared = DUCO_ESP8266 ? 3000 : 20000; // ESP8266 needs a smaller shared slice than ESP32
 const unsigned long i2c_scan_empty_ms = 15000;      // Empty-bus scan delay; bigger = faster solo mining
 const unsigned long i2c_scan_active_ms = 30000;     // Active-bus scan delay; bigger = less I2C overhead
 const unsigned long i2c_read_timeout_ms = 60;       // Enough time to drain an AVR result line without byte loss

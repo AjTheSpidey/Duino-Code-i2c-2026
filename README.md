@@ -2,7 +2,7 @@
 
 Duino-Code I2C 2026 is a Duino-Coin I2C mining setup for mixed small-board rigs.
 
-The main build is an ESP8266/ESP32 master that watches the I2C bus for AVR miners. If no slaves are present, the ESP mines as a normal standalone miner. If slaves are plugged in later, it detects them and starts feeding them jobs. By default the ESP pauses its own miner while AVR slaves are active, which keeps ESP8266 rigs closer to the older I2C miner speed and ping.
+The main build is an ESP8266/ESP32 master that watches the I2C bus for AVR miners. If no slaves are present, the ESP mines as a normal standalone miner. If slaves are plugged in later, it detects them and starts feeding them jobs. By default the ESP also mines while AVR slaves are active, using a small shared slice on ESP8266 and a larger slice on ESP32.
 
 ## What is included
 
@@ -19,13 +19,13 @@ The ESP master is automatic.
 
 ```text
 No slaves detected  -> ESP mines mostly like a normal standalone ESP miner
-Slaves detected     -> ESP controls the AVR I2C miners
+Slaves detected     -> ESP mines lightly and controls the AVR I2C miners
 Slaves removed      -> ESP returns to mostly solo mining
 ```
 
 The I2C scan is cached so the sketch does not waste time probing every address on every loop.
 
-Set `master_mines_with_i2c_slaves` to `true` if you want ESP + AVR mining at the same time. On ESP8266, this can lower AVR hashrate and add ping because WiFi, I2C, and hashing all share one core.
+Set `master_mines_with_i2c_slaves` to `false` if you want the fastest/stablest AVR-only I2C mode. On ESP8266, co-mining can lower AVR hashrate and add ping because WiFi, I2C, and hashing all share one core.
 
 ## Easy settings
 
@@ -51,13 +51,13 @@ const char* wifi_3_pass = "";
 
 const bool master_only = false;
 const bool auto_i2c_slaves = true;
-const bool master_mines_with_i2c_slaves = false;
+const bool master_mines_with_i2c_slaves = true;
 const bool master_turbo_when_solo = true;
 const bool master_use_second_core = true;
 const byte max_avr_miners = 16;
 const unsigned long master_hash_us_master_only = 1000000;
 const unsigned long master_hash_us_single = 250000;
-const unsigned long master_hash_us_shared = 20000;
+const unsigned long master_hash_us_shared = DUCO_ESP8266 ? 3000 : 20000;
 const unsigned long i2c_scan_empty_ms = 15000;
 const unsigned long i2c_scan_active_ms = 30000;
 const unsigned long i2c_read_timeout_ms = 60;
