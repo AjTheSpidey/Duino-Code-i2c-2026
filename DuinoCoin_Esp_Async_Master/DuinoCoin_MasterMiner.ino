@@ -3,6 +3,8 @@
   Lets the ESP master mine its own Duino-Coin job while it keeps brokering I2C slaves.
 */
 
+#pragma GCC optimize("-Ofast")
+
 #include "DSHA1.h"
 #include "Counter.h"
 
@@ -23,6 +25,7 @@
 #define MASTER_CONNECT_EVERY 10000
 #define MASTER_READ_TIMEOUT 100
 #define MASTER_TIMEOUT 30000
+#define MASTER_COUNTER_STEP2(counter) do { ++counter; ++counter; } while (false)
 
 const byte MASTER_STATE_CONNECT = 0;
 const byte MASTER_STATE_VERSION_WAIT = 1;
@@ -42,6 +45,7 @@ volatile bool masterWorkerDone = false;
 volatile unsigned long masterWorkerResult = 0;
 volatile unsigned long masterWorkerHashes = 0;
 volatile unsigned long masterWorkerJobId = 0;
+Counter<10> masterWorkerCounter;
 #endif
 String masterBuffer = "";
 String masterLastBlockHash = "";
@@ -50,7 +54,6 @@ uint8_t masterExpectedHash[20];
 uint8_t masterHash[20];
 DSHA1 masterBaseSha1;
 Counter<10> masterCounter;
-unsigned long masterCounterValue = 0;
 unsigned long masterDifficulty = 0;
 unsigned long masterJobStartMicros = 0;
 unsigned long masterStateTime = 0;
@@ -202,12 +205,14 @@ bool masterMiner_parseJob(String job)
 
   masterBaseSha1.reset().write((const unsigned char*)masterLastBlockHash.c_str(), masterLastBlockHash.length());
   masterCounter.reset();
-  masterCounterValue = 0;
   #if DUCO_ESP32
+    masterWorkerJobActive = false;
     masterWorkerFound = false;
     masterWorkerDone = false;
     masterWorkerResult = 0;
     masterWorkerHashes = 0;
+    masterWorkerCounter.reset();
+    ++masterWorkerCounter;
     masterWorkerJobId++;
     masterWorkerJobActive = true;
   #endif
@@ -258,14 +263,6 @@ bool masterMiner_soloMode()
   return !miningMode_hasI2C() || clients_slaveCount() == 0;
 }
 
-void masterMiner_hashCandidate(unsigned long candidate, uint8_t* output)
-{
-  char candidateBuffer[11];
-  ultoa(candidate, candidateBuffer, 10);
-  DSHA1 ctx = masterBaseSha1;
-  ctx.write((const unsigned char*)candidateBuffer, strlen(candidateBuffer)).finalize(output);
-}
-
 bool masterMiner_parallelEnabled()
 {
   #if DUCO_ESP32
@@ -284,26 +281,27 @@ void masterMiner_hashBatch()
   #if DUCO_ESP32
     if (masterMiner_parallelEnabled()) {
       if (masterWorkerFound) {
-        unsigned long hashesDone = (masterCounterValue / 2UL) + masterWorkerHashes;
+        unsigned long hashesDone = ((unsigned long)((unsigned int)masterCounter) / 2UL) + masterWorkerHashes;
         masterMiner_submit(masterWorkerResult, micros() - masterJobStartMicros, hashesDone);
         blink(BLINK_SHARE_FOUND);
         return;
       }
 
-      while (masterCounterValue < masterDifficulty) {
-        masterMiner_hashCandidate(masterCounterValue, masterHash);
+      while (masterCounter < masterDifficulty) {
+        DSHA1 ctx = masterBaseSha1;
+        ctx.write((const unsigned char*)masterCounter.c_str(), masterCounter.strlen()).finalize(masterHash);
 
         if (memcmp(masterExpectedHash, masterHash, 20) == 0) {
-          unsigned long hashesDone = (masterCounterValue / 2UL) + masterWorkerHashes;
-          masterMiner_submit(masterCounterValue, micros() - masterJobStartMicros, hashesDone);
+          unsigned long hashesDone = ((unsigned long)((unsigned int)masterCounter) / 2UL) + masterWorkerHashes;
+          masterMiner_submit(masterCounter, micros() - masterJobStartMicros, hashesDone);
           blink(BLINK_SHARE_FOUND);
           return;
         }
 
-        masterCounterValue += 2;
+        MASTER_COUNTER_STEP2(masterCounter);
 
         if (masterWorkerFound) {
-          unsigned long hashesDone = (masterCounterValue / 2UL) + masterWorkerHashes;
+          unsigned long hashesDone = ((unsigned long)((unsigned int)masterCounter) / 2UL) + masterWorkerHashes;
           masterMiner_submit(masterWorkerResult, micros() - masterJobStartMicros, hashesDone);
           blink(BLINK_SHARE_FOUND);
           return;
@@ -316,7 +314,7 @@ void masterMiner_hashBatch()
         }
       }
 
-      if (masterCounterValue >= masterDifficulty && masterWorkerDone && !masterWorkerFound) {
+      if (!(masterCounter < masterDifficulty) && masterWorkerDone && !masterWorkerFound) {
         masterWorkerJobActive = false;
         Serial.println("[M]No result found in job range. Requesting a fresh job.");
         masterMiner_state(MASTER_STATE_JOB_REQUEST);
@@ -376,30 +374,30 @@ void masterMiner_task(void* parameter)
     }
 
     unsigned long jobId = masterWorkerJobId;
-    unsigned long candidate = 1;
     uint8_t workerHash[20];
 
     while (masterWorkerJobActive &&
            !masterWorkerFound &&
            masterState == MASTER_STATE_HASHING &&
            jobId == masterWorkerJobId &&
-           candidate < masterDifficulty) {
-      masterMiner_hashCandidate(candidate, workerHash);
+           masterWorkerCounter < masterDifficulty) {
+      DSHA1 ctx = masterBaseSha1;
+      ctx.write((const unsigned char*)masterWorkerCounter.c_str(), masterWorkerCounter.strlen()).finalize(workerHash);
       masterWorkerHashes++;
 
       if (memcmp(masterExpectedHash, workerHash, 20) == 0) {
-        masterWorkerResult = candidate;
+        masterWorkerResult = masterWorkerCounter;
         masterWorkerFound = true;
         break;
       }
 
-      candidate += 2;
-      if ((candidate & 0x3F) == 1) {
+      MASTER_COUNTER_STEP2(masterWorkerCounter);
+      if ((((unsigned int)masterWorkerCounter) & 0x3F) == 1) {
         taskYIELD();
       }
     }
 
-    if (jobId == masterWorkerJobId && candidate >= masterDifficulty) {
+    if (jobId == masterWorkerJobId && !(masterWorkerCounter < masterDifficulty)) {
       masterWorkerDone = true;
     }
   }

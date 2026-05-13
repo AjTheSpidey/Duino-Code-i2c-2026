@@ -5,6 +5,8 @@
   Updated by: AjTheSpidey
 */
 
+#pragma GCC optimize("-Ofast")
+
 void wire_setup();
 void wire_readAll();
 boolean wire_exists(byte address);
