@@ -1,0 +1,14 @@
+{
+  "user": "your_username",
+  "rig": "PC-I2C-Bridge-2026",
+  "mining_key": "",
+  "serial_port": "COM3",
+  "serial_baud": 115200,
+  "slave_job_type": "AVR",
+  "slave_miner_name": "Official AVR Miner 4.3",
+  "first_i2c_address": 1,
+  "last_i2c_address": 16,
+  "scan_empty_seconds": 15,
+  "scan_active_seconds": 30,
+  "i2c_timeout_ms": 5000
+}

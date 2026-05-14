@@ -14,6 +14,16 @@ Root ESP/Raspberry Pi master
 
 This is intentionally experimental because a normal ESP I2C master cannot also be an I2C slave on the same bus without careful board/core support and bus isolation.
 
+For no-WiFi rigs, the better path is the PC bridge:
+
+```text
+PC with internet
+  -> USB serial bridge MCU
+      -> I2C slave miners
+```
+
+That version lives in `DuinoCoin_PC_I2C_Bridge_Experimental`. It avoids the fragile "I2C master and I2C slave on one shared bus" problem while still letting strong no-WiFi microcontrollers mine under one internet-connected host.
+
 Recommended stable approach:
 - Use Raspberry Pi as the root master.
 - Give each ESP sub-master a serial or WiFi API instead of making it an I2C slave.

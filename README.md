@@ -9,6 +9,10 @@ The main build is an ESP8266/ESP32 master that watches the I2C bus for AVR miner
 - ESP8266/ESP32 automatic I2C master miner
 - Arduino AVR I2C slave miner for Uno, Nano, Mega, Leonardo, Micro, and similar boards
 - Raspberry Pi automatic I2C master
+- Pico W / RP2040 WiFi MicroPython I2C master
+- Arduino WiFiNINA I2C master
+- UNO R4 WiFi / WiFiS3 I2C master
+- PC-to-I2C bridge for no-WiFi microcontroller rigs
 - STM32 I2C slave sketch
 - RP2040 / Pico I2C slave sketch
 - Experimental notes for master-to-master bridge setups
@@ -163,6 +167,23 @@ The Pi version uses separate processes and separate pool connections so multi-co
 while I2C slave control stays separate. Its config also includes `master_only`.
 
 ```text
+DuinoCoin_PicoW_WiFi_I2C_Master
+DuinoCoin_Arduino_WiFiNINA_I2C_Master
+DuinoCoin_UNO_R4_WiFi_I2C_Master
+```
+
+Experimental WiFi-capable microcontroller masters for Pico W/RP2040 WiFi, WiFiNINA boards, and UNO R4 WiFi/WiFiS3 boards.
+They use the same basic modes as the ESP master: local mining, automatic I2C slave control, and an obvious `master_only`
+switch. ESP32 remains the best-supported and fastest microcontroller master.
+
+```text
+DuinoCoin_PC_I2C_Bridge_Experimental
+```
+
+PC-hosted bridge for rigs where the microcontrollers do not have WiFi. A USB-connected bridge MCU controls the I2C slaves,
+and the PC Python script handles the Duino-Coin pool connection.
+
+```text
 DuinoCoin_STM32_I2C_Slave
 DuinoCoin_RP2040_I2C_Slave
 ```
@@ -178,3 +199,5 @@ Notes and a small serial status stub for master-to-master rigs.
 ## Status
 
 This is a practical 2026 refresh of the older ESP I2C master idea. The ESP and Raspberry Pi master paths are the main targets. STM32, RP2040, and bridge folders are included for more specialized builds.
+
+See `Resources/controller_support_matrix.md` for the hardware coverage list.

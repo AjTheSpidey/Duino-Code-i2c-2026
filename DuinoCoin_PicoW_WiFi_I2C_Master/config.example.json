@@ -1,0 +1,25 @@
+{
+  "user": "your_username",
+  "rig": "PicoW-I2C-2026",
+  "mining_key": "",
+  "wifi": [
+    {"ssid": "your_wifi_name", "password": "your_wifi_password"},
+    {"ssid": "", "password": ""},
+    {"ssid": "", "password": ""}
+  ],
+  "master_only": false,
+  "auto_i2c_slaves": true,
+  "master_mines_with_i2c_slaves": true,
+  "local_job_type": "ESP32S",
+  "slave_job_type": "AVR",
+  "slave_miner_name": "Official AVR Miner 4.3",
+  "i2c_sda": 4,
+  "i2c_scl": 5,
+  "i2c_freq": 100000,
+  "i2c_first_address": 1,
+  "i2c_last_address": 16,
+  "i2c_empty_scan_seconds": 15,
+  "i2c_active_scan_seconds": 30,
+  "i2c_read_timeout_seconds": 5,
+  "master_hash_budget_ms": 5
+}
