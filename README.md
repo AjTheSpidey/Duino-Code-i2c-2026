@@ -83,6 +83,24 @@ connection and job. The main lane still services WiFi, web, OTA, and I2C, while 
 
 For AVR slave speed, keep `i2c_wire_clock` at `100000` first. `400000` can work with short wiring and good pullups, but Uno/Nano boards often become less reliable at that speed.
 
+## Tuning and testing
+
+There are several variables near the top of the master sketches because different rigs behave differently. They are meant
+for testing, not because there is one perfect setting for every setup.
+
+Useful variables to test:
+
+- `master_only`: disables I2C and turns the WiFi controller into a standalone miner.
+- `master_mines_with_i2c_slaves`: lets the WiFi controller mine while it also serves I2C slaves.
+- `master_hash_us_shared`: controls how much time the master spends hashing while slaves are active.
+- `i2c_wire_clock`: usually `100000` is safest for AVR slaves; `400000` can be faster but less stable.
+- `i2c_read_timeout_ms`: raises or lowers how long the master waits for a slave result line.
+- `i2c_scan_active_ms`: raises or lowers how often the master rescans while slaves are already online.
+- `max_avr_miners`: controls the scanned slave address range.
+
+For ESP8266 rigs, small `master_hash_us_shared` values usually protect slave speed and ping. For ESP32/S3 rigs, the master
+can normally mine harder because it has more CPU headroom and a second-core lane.
+
 ## ESP master upload files
 
 Open this folder in Arduino IDE:
@@ -201,3 +219,10 @@ Notes and a small serial status stub for master-to-master rigs.
 This is a practical 2026 refresh of the older ESP I2C master idea. The ESP and Raspberry Pi master paths are the main targets. STM32, RP2040, and bridge folders are included for more specialized builds.
 
 See `Resources/controller_support_matrix.md` for the hardware coverage list.
+
+## Contributing
+
+Fork the repo, make your changes in a branch, then open a pull request back here. In the pull request, describe what you
+added or fixed, what board you tested, what settings you used, and any hashrate/ping/stability changes you noticed.
+
+See `CONTRIBUTING.md` for the full checklist.
